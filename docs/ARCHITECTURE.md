@@ -227,7 +227,14 @@ Adapters can share a lower-level structured model client internally, but provide
 
 ### 7.2 Demo adapters
 
-Demo Mode is not a static screenshot or a canned report. It uses:
+The public Hackathon journey uses one immutable, versioned presentation fixture
+at `/audits/demo`. This deliberately narrow slice is database-independent and
+exists so judges can inspect a complete score, evidence, findings, and guardrail
+experience without configuration or infrastructure. It is labeled as a
+deterministic simulation and does not claim to be a runtime assessment of a
+user-defined agent.
+
+The broader product architecture for user-defined Demo audits uses:
 
 - versioned deterministic surface rules;
 - capability-aware case templates;

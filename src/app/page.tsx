@@ -1,177 +1,125 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
-import { getApplicationContainer, getPublicServerCapabilities } from "@/bootstrap";
-import { AppLink, Badge, Card, EmptyState, ErrorState } from "@/shared/presentation/components";
-import { formatUtcInstant } from "@/shared/presentation/format";
+import { AppLink, Badge, Card } from "@/shared/presentation/components";
 
-export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Agent Auditor" };
 
-export default async function HomePage() {
-  const capabilities = getPublicServerCapabilities();
-  let data: Awaited<ReturnType<typeof loadHomeData>> | undefined;
-  try {
-    data = await loadHomeData();
-  } catch {
-    data = undefined;
-  }
+const auditSteps = [
+  {
+    description:
+      "Inspect the trusted prompt, declared permissions, simulated tools, and operational controls.",
+    number: "01",
+    title: "Map the attack surface",
+  },
+  {
+    description:
+      "Exercise eight fixed behavior tests against a closed synthetic Support Desk Agent.",
+    number: "02",
+    title: "Run deterministic tests",
+  },
+  {
+    description:
+      "Review category scores, evidence-backed findings, and concrete recommended guardrails.",
+    number: "03",
+    title: "Get an actionable report",
+  },
+] as const;
 
+export default function HomePage() {
   return (
-    <div className="grid gap-10">
-      <section className="grid items-center gap-8 lg:grid-cols-[1.25fr_0.75fr]">
-        <div className="grid gap-5">
-          <Badge>Engineering foundation</Badge>
-          <h1 className="max-w-4xl text-4xl font-black tracking-[-0.035em] sm:text-6xl">
-            Audit agent behavior before real tools are connected.
+    <div className="grid gap-16 py-5">
+      <section className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid justify-items-start gap-6">
+          <Badge tone="success">Hackathon Demo · Ready now</Badge>
+          <h1 className="max-w-4xl text-5xl font-black tracking-[-0.045em] sm:text-7xl">
+            See how an AI agent fails—and how to fix it.
           </h1>
-          <p className="max-w-3xl text-lg leading-8 text-[var(--text-muted)]">
-            Agent Auditor stores versioned agent definitions and queues behavioral security audits
-            in a closed, side-effect-free simulation architecture.
+          <p className="max-w-3xl text-lg leading-8 text-[var(--text-muted)] sm:text-xl">
+            Run a complete behavioral security audit against a synthetic agent. In seconds, Agent
+            Auditor turns observed behavior into scores, evidence, findings, and recommended
+            guardrails.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <AppLink href="/agents/new">Create an agent</AppLink>
-            <AppLink href="/agents" variant="secondary">
-              Explore seeded examples
+          <div className="flex flex-wrap items-center gap-4">
+            <AppLink className="px-6 py-3 text-base" href="/audits/demo">
+              Run Demo Audit
             </AppLink>
+            <span className="text-sm text-[var(--text-muted)]">
+              Deterministic · Keyless · No external calls
+            </span>
           </div>
         </div>
-        <Card className="grid gap-5">
+
+        <Card className="grid gap-6 border-t-4 border-t-[var(--accent)]">
           <div>
             <p className="text-sm font-bold uppercase tracking-wide text-[var(--accent)]">
-              Operating modes
+              Demo target
             </p>
-            <h2 className="mt-2 text-2xl font-black">Local by default</h2>
+            <h2 className="mt-2 text-2xl font-black">Support Desk Agent</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+              A synthetic tool-using agent with customer record access, ticket updates, knowledge
+              retrieval, and a confirmation-gated credit action.
+            </p>
           </div>
-          <div className="grid gap-4">
-            <div className="rounded-lg bg-[var(--accent-soft)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <strong>Demo Mode</strong>
-                <Badge tone="success">Available</Badge>
-              </div>
-              <p className="mt-2 text-sm text-[var(--text-muted)]">
-                Deterministic and keyless. No provider or real tool calls.
-              </p>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <div className="rounded-lg bg-[var(--surface-strong)] p-4">
+              <dt className="font-bold text-[var(--text-muted)]">Behavior tests</dt>
+              <dd className="mt-1 text-2xl font-black">8</dd>
             </div>
             <div className="rounded-lg bg-[var(--surface-strong)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <strong>Live Mode</strong>
-                <Badge tone="neutral">
-                  {capabilities.liveModeConfigured ? "Disabled in foundation" : "Not configured"}
-                </Badge>
-              </div>
-              <p className="mt-2 text-sm text-[var(--text-muted)]">
-                Optional and explicitly unavailable in this phase. It never falls back silently.
-              </p>
+              <dt className="font-bold text-[var(--text-muted)]">Risk categories</dt>
+              <dd className="mt-1 text-2xl font-black">5</dd>
             </div>
+            <div className="rounded-lg bg-[var(--surface-strong)] p-4">
+              <dt className="font-bold text-[var(--text-muted)]">Environment</dt>
+              <dd className="mt-1 font-bold">Closed simulation</dd>
+            </div>
+            <div className="rounded-lg bg-[var(--surface-strong)] p-4">
+              <dt className="font-bold text-[var(--text-muted)]">Output</dt>
+              <dd className="mt-1 font-bold">Complete report</dd>
+            </div>
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <Badge tone="success">No API key</Badge>
+            <Badge>Static fixture v1.0.0</Badge>
+            <Badge>Repeatable</Badge>
           </div>
-          <p className="text-sm text-[var(--text-muted)]">
-            This tool reports observed behavior; it does not certify or guarantee security.
-          </p>
         </Card>
       </section>
 
-      <section className="grid gap-5" aria-labelledby="recent-agents-title">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-[var(--accent)]">
-              Catalog
-            </p>
-            <h2 className="text-2xl font-black" id="recent-agents-title">
-              Recent agents
-            </h2>
-          </div>
-          <Link className="font-bold text-[var(--accent)]" href="/agents">
-            View all agents
-          </Link>
+      <section aria-labelledby="how-it-works-title" className="grid gap-6">
+        <div className="max-w-2xl">
+          <p className="text-sm font-bold uppercase tracking-wide text-[var(--accent)]">
+            One focused journey
+          </p>
+          <h2 className="mt-2 text-3xl font-black" id="how-it-works-title">
+            From agent definition to defensible action
+          </h2>
         </div>
-        {data === undefined ? (
-          <ErrorState description="The local database is unavailable. Apply migrations and seed data, then reload." />
-        ) : data.agents.items.length === 0 ? (
-          <EmptyState
-            actionHref="/agents/new"
-            actionLabel="Create your first agent"
-            description="No agent definitions have been stored yet."
-            title="The catalog is empty"
-          />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {data.agents.items.map((item) => (
-              <Card className="grid gap-3" key={item.profile.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-lg font-bold">
-                    <Link href={`/agents/${item.profile.id}`}>{item.profile.name}</Link>
-                  </h3>
-                  <Badge>Revision {item.latestRevisionNumber}</Badge>
-                </div>
-                <p className="line-clamp-3 text-sm text-[var(--text-muted)]">
-                  {item.profile.description || "No description provided."}
-                </p>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Updated {formatUtcInstant(item.profile.updatedAt)} UTC
-                </p>
-              </Card>
-            ))}
-          </div>
-        )}
+        <ol className="grid gap-5 md:grid-cols-3">
+          {auditSteps.map((step) => (
+            <li className="surface-card grid content-start gap-4 p-6" key={step.number}>
+              <span className="font-mono text-sm font-black text-[var(--accent)]">
+                {step.number}
+              </span>
+              <h3 className="text-xl font-bold">{step.title}</h3>
+              <p className="text-sm leading-6 text-[var(--text-muted)]">{step.description}</p>
+            </li>
+          ))}
+        </ol>
       </section>
 
-      <section className="grid gap-5" aria-labelledby="recent-audits-title">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-[var(--accent)]">Queue</p>
-            <h2 className="text-2xl font-black" id="recent-audits-title">
-              Recent audit runs
-            </h2>
-          </div>
-          <Link className="font-bold text-[var(--accent)]" href="/audits">
-            View all audits
-          </Link>
+      <section className="surface-card flex flex-wrap items-center justify-between gap-6 bg-[var(--accent-soft)] p-7">
+        <div>
+          <h2 className="text-2xl font-black">Ready to inspect the evidence?</h2>
+          <p className="mt-2 text-[var(--text-muted)]">
+            The complete judge flow works without storage, configuration, or outbound provider
+            access.
+          </p>
         </div>
-        {data === undefined ? null : data.audits.length === 0 ? (
-          <EmptyState
-            description="Audit runs appear here after a Demo audit is queued from an agent page."
-            title="No audit runs yet"
-          />
-        ) : (
-          <div className="grid gap-3">
-            {data.audits.map((run) => (
-              <Link
-                className="surface-card flex flex-wrap items-center justify-between gap-3 p-4 no-underline"
-                href={`/audits/${run.id}`}
-                key={run.id}
-              >
-                <span>
-                  <strong>{run.mode} audit</strong>
-                  <span className="ml-3 text-sm text-[var(--text-muted)]">
-                    {formatUtcInstant(run.createdAt)} UTC
-                  </span>
-                </span>
-                <Badge
-                  tone={
-                    run.status === "FAILED"
-                      ? "danger"
-                      : run.status === "CANCELLED"
-                        ? "warning"
-                        : "neutral"
-                  }
-                >
-                  {run.status}
-                </Badge>
-              </Link>
-            ))}
-          </div>
-        )}
+        <AppLink className="px-6" href="/audits/demo">
+          Run Demo Audit
+        </AppLink>
       </section>
     </div>
   );
-}
-
-async function loadHomeData() {
-  const application = await getApplicationContainer();
-  const [agents, audits] = await Promise.all([
-    application.agents.list.execute(6),
-    application.audits.list.execute(6),
-  ]);
-  return { agents, audits };
 }

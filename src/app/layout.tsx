@@ -15,8 +15,7 @@ export const metadata: Metadata = {
 
 const navigation = [
   { href: "/", label: "Home" },
-  { href: "/agents", label: "Agents" },
-  { href: "/audits", label: "Audits" },
+  { href: "/audits/demo", label: "Demo audit" },
 ] as const;
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
@@ -66,7 +65,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         </main>
         <footer className="mt-14 border-t py-6 text-sm text-[var(--text-muted)]">
           <div className="shell-width flex flex-wrap justify-between gap-3">
-            <p>Local-first, side-effect-free foundations.</p>
+            <p>Deterministic, keyless, side-effect-free Demo Mode.</p>
             <p>Apache-2.0 · Copyright 2026 Jordi Garcia Castillón</p>
           </div>
         </footer>

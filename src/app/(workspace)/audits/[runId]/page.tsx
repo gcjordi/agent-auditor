@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 
 import { getApplicationContainer } from "@/bootstrap";
 import { CancelAuditButton } from "@/modules/auditing/presentation/components/cancel-audit-button";
+import { DemoAuditExperience } from "@/modules/auditing/presentation/components/demo-audit-experience";
+import { DEMO_AUDIT_SLUG } from "@/modules/auditing/presentation/demo-audit-fixture";
 import { NotFoundError } from "@/shared/domain";
 import { Alert, AppLink, Badge, Card } from "@/shared/presentation/components";
 import { formatUtcInstant } from "@/shared/presentation/format";
@@ -15,6 +17,8 @@ interface PageProps {
 
 export default async function AuditRunPage({ params }: PageProps) {
   const { runId } = await params;
+  if (runId === DEMO_AUDIT_SLUG) return <DemoAuditExperience />;
+
   let run;
   try {
     const application = await getApplicationContainer();

@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "node scripts/run-next.ts dev --hostname 127.0.0.1 --port 3000",
     "build": "pnpm db:generate && node scripts/run-next.ts build",
-    "start": "node scripts/run-next.ts start --hostname 127.0.0.1 --port 3000",
+    "start": "node scripts/run-next.ts start --hostname 0.0.0.0",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",

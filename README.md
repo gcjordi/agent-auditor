@@ -9,11 +9,11 @@ instructions, declared tools, permissions, and operational controls shape its
 behavior. It is being built as an engineering aid for developers and security
 teams, not as a certification service or a guarantee that an agent is secure.
 
-> **Current status:** the repository is at the M1/M2 engineering-foundation
-> stage. Agent definitions and immutable revisions can be persisted, and Demo
-> audit runs can be queued and inspected. The audit execution engine, findings,
-> final reports, guardrail generation, and verification workflow are not
-> implemented in this phase. Queued runs never fabricate results.
+> **Current status:** the Hackathon MVP includes one complete, polished,
+> deterministic Demo audit at `/audits/demo`. It runs without a database, API
+> key, external service, or network request and produces a fixed evidence-backed
+> report. The broader persisted engine remains an engineering foundation;
+> ordinary queued runs still never fabricate results.
 
 ## Why Agent Auditor
 
@@ -23,13 +23,18 @@ interact in ways that are difficult to review separately. Agent Auditor
 provides a versioned, evidence-oriented foundation for testing those
 interactions inside a side-effect-free simulation boundary.
 
-The intended product journey is to define an agent, plan and run adaptive tests
-against synthetic tools, inspect evidence-backed findings, apply reviewable
-guardrails, and rerun the same locked plan to measure change. This repository
-currently implements the durable foundation for that later workflow.
+The Hackathon journey exercises that product idea through one versioned
+synthetic Support Desk fixture. The durable domain, persistence, and API
+foundation remains available for the later user-defined audit pipeline.
 
-## What works in this foundation
+## What works in the Hackathon MVP
 
+- A landing-to-report Demo journey with bounded simulated progress.
+- A deterministic 62/100 high-risk report with five category scores, eight
+  tests, four evidence-backed findings, and four recommended guardrails.
+- Reset and run-again actions that always reproduce the same report.
+- A public judge path with no database read, mutation API, provider, API key,
+  random value, or persistent storage dependency.
 - A strict TypeScript, Next.js App Router application with an accessible local
   workspace shell.
 - Agent profiles with immutable, fingerprinted revisions.
@@ -41,24 +46,21 @@ currently implements the durable foundation for that later workflow.
 - Versioned HTTP contracts under `/api/v1` with safe error envelopes.
 - Deterministic synthetic seed agents for local exploration.
 - Demo and fake provider foundations that require no network or API key.
-- A server-only OpenAI adapter boundary that is dormant unless Live Mode is
-  explicitly configured in a later product phase.
 - Keyless lint, type, architecture, security, test, build, and CI foundations.
 
-The project does **not** yet execute a behavioral audit or produce security
-findings, scores, guardrails, or comparisons. A queued run is a truthful record
-of requested future work, not evidence that an audit completed.
+The public report is an explicitly labeled deterministic simulation fixture,
+not the output of the unfinished persisted audit worker and not a security
+certification. A normal queued run remains a truthful record of requested
+future work.
 
-## Operating modes
+## Demo runtime
 
-| Mode | API key      | Current behavior                                                                                                                                                                                                            |
-| ---- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Demo | Not required | Default development and test mode. Uses deterministic local data and mock/provider contracts. No outbound provider call is made. Full Demo audit execution arrives in M3.                                                   |
-| Live | Optional     | Disabled for audit creation in this phase. The UI can report whether optional server configuration is present, but that does not validate access or activate the incomplete Live path. There is no silent fallback to Demo. |
+| Mode | API key      | Current behavior                                                                                                                                |
+| ---- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Demo | Not required | Runs the bundled deterministic fixture locally. No provider, external service, persistent database, real tool, or outbound request is involved. |
 
-Do not add an API key for ordinary setup, development, CI, or verification. If
-Live Mode is configured in a future phase, submitted audit content may leave
-the local process; that path will require explicit disclosure and consent.
+Do not add an API key for setup, development, CI, verification, or the public
+demo. Provider-backed execution is outside this Hackathon MVP.
 
 ## Safety model
 
@@ -150,13 +152,12 @@ SQLite is embedded; no separately running database or cloud service is needed.
 corepack enable
 pnpm install --frozen-lockfile
 pnpm db:generate
-pnpm db:migrate:deploy
-pnpm db:seed
 pnpm dev
 ```
 
-Open `http://127.0.0.1:3000`. No OpenAI API key is required. Copy
-`.env.example` to `.env` only when you need to override the safe local defaults.
+Open `http://127.0.0.1:3000` and select **Run Demo Audit**. No environment file,
+database migration, seed, or API key is required for the judge journey. Apply
+the database commands separately only when developing the persisted workspace.
 
 For platform-specific notes and a clean setup walkthrough, see
 [Development setup](docs/development/SETUP.md).
@@ -169,7 +170,7 @@ Server configuration is parsed once and validated. The main settings are:
 | ---------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
 | `NODE_ENV`                   | No       | Validated runtime environment (`development`, `test`, or `production`).                                               |
 | `DATABASE_URL`               | No       | SQLite connection URL; defaults to `file:./prisma/dev.db`.                                                            |
-| `APP_HOST` / `APP_PORT`      | No       | Validated local-origin metadata. Standard scripts bind `127.0.0.1:3000`.                                              |
+| `APP_HOST` / `APP_PORT`      | No       | Validated local-origin metadata for protected mutation APIs. Development binds `127.0.0.1:3000`.                      |
 | `LOG_LEVEL`                  | No       | Structured local log level.                                                                                           |
 | `AUDIT_CONCURRENCY`          | No       | Bounded local job concurrency.                                                                                        |
 | `AUDIT_MAX_TEST_CASES`       | No       | Maximum planned cases accepted by the foundation.                                                                     |
@@ -233,6 +234,7 @@ tests also use Demo Mode and an isolated SQLite database. See
 - `/agents/[agentId]`
 - `/audits`
 - `/audits/[runId]`
+- `/audits/demo` (database-independent Hackathon journey)
 
 ### HTTP API
 
@@ -252,12 +254,12 @@ headers, status codes, and error envelopes.
 
 ## Current limitations
 
-- Audit jobs are persisted but the complete engine is intentionally absent.
-- No adaptive test generation, target execution, evidence evaluation, finding
-  correlation, report scoring, guardrail generation, or verification comparison
-  runs in this phase.
-- Live Mode is optional and disabled throughout this foundation; no automated check calls the
-  OpenAI API.
+- The public Demo report is one immutable synthetic fixture, not a runtime
+  assessment of user-defined agents.
+- Audit jobs are persisted, but the complete user-defined execution engine and
+  comparable verification workflow remain intentionally absent.
+- Provider-backed execution is disabled; no automated check calls an external
+  model API.
 - All tools are declarations and future simulations; real external tools,
   remote agents, arbitrary plugins, browser automation, and dynamic code are
   outside the safety boundary.
@@ -267,10 +269,9 @@ headers, status codes, and error envelopes.
 
 ## Roadmap
 
-M1 and M2 establish the engineering, domain, persistence, and quality
-foundation. M3 adds the complete deterministic Demo execution path. Later
-milestones add evidence and scoring, remediation and comparable verification,
-then optional Live Mode and release hardening. See [Roadmap](docs/ROADMAP.md).
+The Hackathon MVP adds a complete deterministic judge slice over the M1/M2
+foundation. The roadmap retains the larger user-defined execution, persistence,
+and comparable verification milestones. See [Roadmap](docs/ROADMAP.md).
 
 ## Contributing and security
 
