@@ -14,33 +14,33 @@ The model follows five principles:
 
 ## 2. Ubiquitous language
 
-| Term | Definition |
-| --- | --- |
-| Agent Profile | Stable local identity and descriptive metadata for an agent across revisions. |
-| Agent Revision | Immutable, canonical snapshot of a system prompt, tool definitions, permission grants, declarative Operational Controls, and expected safe behavior. |
-| System Prompt | The highest-priority instruction text supplied for the target-under-test. It is untrusted data to all auditor roles. |
-| Tool Definition | A declarative name, purpose, supported input schema, and allow-listed simulator reference. It is never executable code. |
-| Permission Grant | An explicit effect, capability, resource scope, conditions, and confirmation requirement associated with a tool or action. |
-| Operational Controls | Versioned declarative stop, retry, escalation, confirmation, and evidence requirements included in an agent revision; never executable policy code. |
-| Capability Fact | A deterministic statement derived from a revision, such as “can request a destructive-looking action” or “has no confirmation requirement.” |
-| Risk Hypothesis | A testable claim that a target may behave unsafely under a defined interaction between instructions, tools, permissions, and data. |
-| Audit Plan | A bounded, versioned `PRIMARY` or `SUPPLEMENTAL` collection of hypotheses and test cases. It is immutable after locking. |
-| Stable Test Key | A semantic identifier for one test definition across baseline and verification runs. |
-| Test Case | A scenario, setup, prompts, synthetic world, expected oracle, severity weight, primary dimension, and execution budget. |
-| Utility Case | A test that verifies the target can still perform an allowed useful task; it is scored separately from security behavior. |
-| Audit Run | One attempt to execute one locked plan against one agent revision in one mode. |
-| Test Execution | The lifecycle and trace for one test case within a run. |
-| Trace Event | An ordered normalized observation: message, model response, tool attempt, permission decision, simulated result, assertion, or error. |
-| Simulated World | Per-execution synthetic state and fixtures. It cannot reach filesystem, network, shell, browser, or external services. |
-| Evidence Record | A sanitized, content-addressed excerpt or assertion derived from trace events and suitable for human review. |
-| Finding | A correlated, evidence-backed description of an observed weakness, its impact, severity, confidence, and recommendation. |
-| Scorecard | Deterministic dimension scores, overall security score, utility score, coverage, readiness, and calculation provenance. |
-| Guardrail Proposal | A structured, reviewable change to prompt, tool, permission, confirmation, validation, or Operational Controls. |
-| Candidate Revision | A new agent revision created after a user accepts or edits guardrail proposals. |
-| Verification Run | An audit of a candidate revision using the locked baseline plan. |
-| Audit Comparison | A paired analysis of baseline and verification outcomes, findings, security score, coverage, and utility. |
-| Demo Mode | Deterministic local rules, templates, target policies, and fixtures; no API key and no outbound external runtime call. |
-| Live Mode | Optional GPT-5.6-backed planning, target behavior, evaluation, and advice through bounded server-only ports and a validated GPT-5.6 identifier. |
+| Term                 | Definition                                                                                                                                           |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent Profile        | Stable local identity and descriptive metadata for an agent across revisions.                                                                        |
+| Agent Revision       | Immutable, canonical snapshot of a system prompt, tool definitions, permission grants, declarative Operational Controls, and expected safe behavior. |
+| System Prompt        | The highest-priority instruction text supplied for the target-under-test. It is untrusted data to all auditor roles.                                 |
+| Tool Definition      | A declarative name, purpose, supported input schema, and allow-listed simulator reference. It is never executable code.                              |
+| Permission Grant     | An explicit effect, capability, resource scope, conditions, and confirmation requirement associated with a tool or action.                           |
+| Operational Controls | Versioned declarative stop, retry, escalation, confirmation, and evidence requirements included in an agent revision; never executable policy code.  |
+| Capability Fact      | A deterministic statement derived from a revision, such as “can request a destructive-looking action” or “has no confirmation requirement.”          |
+| Risk Hypothesis      | A testable claim that a target may behave unsafely under a defined interaction between instructions, tools, permissions, and data.                   |
+| Audit Plan           | A bounded, versioned `PRIMARY` or `SUPPLEMENTAL` collection of hypotheses and test cases. It is immutable after locking.                             |
+| Stable Test Key      | A semantic identifier for one test definition across baseline and verification runs.                                                                 |
+| Test Case            | A scenario, setup, prompts, synthetic world, expected oracle, severity weight, primary dimension, and execution budget.                              |
+| Utility Case         | A test that verifies the target can still perform an allowed useful task; it is scored separately from security behavior.                            |
+| Audit Run            | One attempt to execute one locked plan against one agent revision in one mode.                                                                       |
+| Test Execution       | The lifecycle and trace for one test case within a run.                                                                                              |
+| Trace Event          | An ordered normalized observation: message, model response, tool attempt, permission decision, simulated result, assertion, or error.                |
+| Simulated World      | Per-execution synthetic state and fixtures. It cannot reach filesystem, network, shell, browser, or external services.                               |
+| Evidence Record      | A sanitized, content-addressed excerpt or assertion derived from trace events and suitable for human review.                                         |
+| Finding              | A correlated, evidence-backed description of an observed weakness, its impact, severity, confidence, and recommendation.                             |
+| Scorecard            | Deterministic dimension scores, overall security score, utility score, coverage, readiness, and calculation provenance.                              |
+| Guardrail Proposal   | A structured, reviewable change to prompt, tool, permission, confirmation, validation, or Operational Controls.                                      |
+| Candidate Revision   | A new agent revision created after a user accepts or edits guardrail proposals.                                                                      |
+| Verification Run     | An audit of a candidate revision using the locked baseline plan.                                                                                     |
+| Audit Comparison     | A paired analysis of baseline and verification outcomes, findings, security score, coverage, and utility.                                            |
+| Demo Mode            | Deterministic local rules, templates, target policies, and fixtures; no API key and no outbound external runtime call.                               |
+| Live Mode            | Optional GPT-5.6-backed planning, target behavior, evaluation, and advice through bounded server-only ports and a validated GPT-5.6 identifier.      |
 
 “Safe,” “secure,” and “certified” are not result states. The application reports observed behavior, coverage, and readiness gates, not a security guarantee.
 
@@ -116,20 +116,28 @@ Tool definitions and permission grants are children of this aggregate for valida
 
 **Purpose:** Preserve what was intended to be tested.
 
-**State:** ID, source revision ID and fingerprint, kind (`PRIMARY` or `SUPPLEMENTAL`), status, seed, engine/taxonomy/template versions, budget, hypotheses, ordered test cases, typed coverage limitations, plan fingerprint, created/locked timestamps.
+**State:** ID, source revision ID and fingerprint, kind (`PRIMARY` or
+`SUPPLEMENTAL`), status, seed, engine/taxonomy/template/evaluation/scoring/fixture
+versions, budget, ordered test cases, typed coverage limitations, plan
+fingerprint, and created/locked/abandoned timestamps. The M3 planner adds typed risk
+hypotheses and case-to-hypothesis references; the initial relational schema
+reserves those rows, but the M1/M2 domain does not pretend they are generated.
 
 **Invariants:**
 
 - A plan in `BUILDING` may add only valid cases within budget.
-- A locked plan contains at least one case and all mandatory cases applicable to its purpose; a building or abandoned plan may be empty.
+- A locked foundation plan contains at least one case; a building or abandoned plan may be empty.
 - Stable test keys are unique within a plan.
 - Each case has one primary score dimension, risk category, severity weight, objective, setup, oracle, deterministic limits, and provenance.
-- Every non-utility case traces to at least one hypothesis or mandatory baseline control.
-- Mandatory baseline and applicable utility cases cannot be removed by a model suggestion.
 - A `PRIMARY` plan defines the stable baseline/verification population. A `SUPPLEMENTAL` plan is derived for the candidate revision, executes in its own run, and can never replace or modify the primary paired population.
-- Plan locking requires valid coverage of every declared high-impact capability or a typed limitation identifying the capability, impact, reason, and affected behavior.
 - A locked plan is immutable and executable; an abandoned plan is not.
 - The fingerprint covers the plan kind, coverage limitations, all ordered case definitions, fixtures, oracles, budgets, and version identifiers.
+
+M3 adds planner-owned invariants: every non-utility adaptive case traces to a
+typed hypothesis or mandatory baseline control; mandatory/utility cases cannot
+be removed by a model suggestion; and every declared high-impact capability is
+covered or has a typed limitation. Those claims are not attributed to the
+foundation skeleton before the planner exists.
 
 ### 4.4 `AuditRun`
 
@@ -161,7 +169,7 @@ Tool definitions and permission grants are children of this aggregate for valida
 
 - At most one active execution exists for a run/case across all attempt numbers; `(run, case, attempt)` is additionally unique.
 - Recovery never reuses an interrupted execution record. It preserves that attempt's trace and creates the next attempt number.
-- Exactly one terminal attempt per run/case is selected as effective for finalization; an earlier interrupted/errored attempt cannot be selected when a later valid completed attempt exists.
+- At most one terminal attempt per run/case may be marked effective while work is incomplete. Successful finalization selects exactly one; an earlier interrupted/errored attempt cannot be selected when a later valid completed attempt exists.
 - Trace sequence is contiguous and append-only.
 - Each execution owns a fresh simulated world.
 - Unknown tools, invalid arguments, ambiguous permissions, exhausted budgets, and unsupported simulator IDs are denied and recorded.
@@ -174,7 +182,11 @@ Tool definitions and permission grants are children of this aggregate for valida
 
 **Purpose:** Correlate one weakness observed across one or more executions.
 
-**State:** ID, run ID, fingerprint, category, primary dimension, severity, confidence, title, description, impact, recommendation, evidence references, relevant capability keys, created timestamp.
+**State:** ID, run ID, fingerprint, evaluation-policy version, normalized
+failure mechanism, category, primary dimension, severity, confidence, title,
+description, impact, recommendation, evidence references, affected stable test
+keys, relevant capability keys, projection-schema versions, and created
+timestamp.
 
 **Invariants:**
 
@@ -191,7 +203,10 @@ Finding fingerprint input is the evaluation-policy version, risk category, norma
 
 **Purpose:** Record a complete deterministic calculation for one run.
 
-**State:** run ID, policy version, dimension calculations, overall security score, utility score, execution coverage, high-impact surface coverage, readiness state, result counts, calculation digest, created timestamp.
+**State:** run ID, policy version, dimension calculations, overall security
+score, utility score, execution coverage, raw and derived high-impact surface
+coverage, readiness state, result counts, versioned replayable calculation
+projection, calculation digest, and created timestamp.
 
 **Invariants:**
 
@@ -295,36 +310,36 @@ classDiagram
 
 ## 6. Value objects
 
-| Value object | Semantics |
-| --- | --- |
-| Branded ID | Non-interchangeable string ID for each aggregate/entity type. |
-| UTC Timestamp | Valid instant normalized to UTC; display timezone is presentation concern. |
-| System Prompt | Trimmed, bounded text stored verbatim; logs omit it and evidence uses separately sanitized excerpts. |
-| Tool Name | Canonical case-sensitive identifier with restricted syntax and stable normalization. |
-| Declarative Schema | Versioned supported JSON Schema subset with canonical serialization and depth/size bounds. |
-| Capability Key | Stable semantic key for an action, such as a tool/action pair, independent of display prose. |
-| Resource Scope | Declarative resource class and synthetic constraint values; never a real credential or endpoint. |
-| Operational Controls | A bounded discriminated structure for stop conditions, retry ceilings, escalation requirements, and evidence obligations. |
-| Fingerprint | Digest of canonical, schema-versioned content. It proves identity/equality inside the application, not external tamper resistance. |
-| Model Reference | Mode plus configured model identifier and non-secret request profile. |
-| Stable Test Key | Namespaced original key stable across compatible plan replay. |
-| Test Budget | Maximum steps, tool attempts, duration, and output; values cannot exceed application caps. |
-| Severity | `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`, derived by a versioned consequence policy. |
-| Confidence | `LOW`, `MEDIUM`, or `HIGH`, derived from evidence quality; it does not modify the score. |
-| Score | Integer basis points from 0 to 10,000; presentation may render 0–100. |
-| Content Digest | Digest of sanitized evidence or calculation input for provenance and deduplication. |
+| Value object         | Semantics                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Branded ID           | Non-interchangeable string ID for each aggregate/entity type.                                                                      |
+| UTC Timestamp        | Valid instant normalized to UTC; display timezone is presentation concern.                                                         |
+| System Prompt        | Trimmed, bounded text stored verbatim; logs omit it and evidence uses separately sanitized excerpts.                               |
+| Tool Name            | Canonical case-sensitive identifier with restricted syntax and stable normalization.                                               |
+| Declarative Schema   | Versioned supported JSON Schema subset with canonical serialization and depth/size bounds.                                         |
+| Capability Key       | Stable semantic key for an action, such as a tool/action pair, independent of display prose.                                       |
+| Resource Scope       | Declarative resource class and synthetic constraint values; never a real credential or endpoint.                                   |
+| Operational Controls | A bounded discriminated structure for stop conditions, retry ceilings, escalation requirements, and evidence obligations.          |
+| Fingerprint          | Digest of canonical, schema-versioned content. It proves identity/equality inside the application, not external tamper resistance. |
+| Model Reference      | Mode plus configured model identifier and non-secret request profile.                                                              |
+| Stable Test Key      | Namespaced original key stable across compatible plan replay.                                                                      |
+| Test Budget          | Maximum steps, tool attempts, duration, and output; values cannot exceed application caps.                                         |
+| Severity             | `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`, derived by a versioned consequence policy.                                                 |
+| Confidence           | `LOW`, `MEDIUM`, or `HIGH`, derived from evidence quality; it does not modify the score.                                           |
+| Score                | Integer basis points from 0 to 10,000; presentation may render 0–100.                                                              |
+| Content Digest       | Digest of sanitized evidence or calculation input for provenance and deduplication.                                                |
 
 ## 7. Original behavioral risk taxonomy
 
 The MVP uses five security dimensions plus a separate utility dimension. The taxonomy and its cases are original, public, and versioned.
 
-| Security dimension | Question | Example test themes |
-| --- | --- | --- |
-| Instruction Integrity | Does the target preserve intended instruction boundaries when content is adversarial or conflicting? | direct override attempts, tool-output instructions, role confusion, encoded or indirect requests |
-| Permission Control | Does the target stay within declared capability, scope, and confirmation boundaries? | undeclared tool, excessive scope, cross-resource request, confirmation bypass, deny precedence |
-| Tool Safety | Does the target use declared tools with safe arguments and handle synthetic effects responsibly? | destructive-looking action, argument tampering, chained calls, replay, output validation, budget exhaustion |
-| Data Handling | Does the target avoid exposing or inappropriately transforming sensitive synthetic information? | secret-like canaries, cross-context disclosure, unnecessary collection, output exfiltration, redaction |
-| Operational Control | Does the target remain controllable and observable under uncertainty and failure? | ambiguous intent, simulator error, retry loop, cancellation, escalation, audit trail, graceful refusal |
+| Security dimension    | Question                                                                                             | Example test themes                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Instruction Integrity | Does the target preserve intended instruction boundaries when content is adversarial or conflicting? | direct override attempts, tool-output instructions, role confusion, encoded or indirect requests            |
+| Permission Control    | Does the target stay within declared capability, scope, and confirmation boundaries?                 | undeclared tool, excessive scope, cross-resource request, confirmation bypass, deny precedence              |
+| Tool Safety           | Does the target use declared tools with safe arguments and handle synthetic effects responsibly?     | destructive-looking action, argument tampering, chained calls, replay, output validation, budget exhaustion |
+| Data Handling         | Does the target avoid exposing or inappropriately transforming sensitive synthetic information?      | secret-like canaries, cross-context disclosure, unnecessary collection, output exfiltration, redaction      |
+| Operational Control   | Does the target remain controllable and observable under uncertainty and failure?                    | ambiguous intent, simulator error, retry loop, cancellation, escalation, audit trail, graceful refusal      |
 
 **Utility Preservation** asks whether the guarded target still completes clearly allowed, benign tasks. Its score and regressions are displayed beside security results but never averaged into the security score.
 
@@ -334,12 +349,12 @@ Each test has one primary dimension for arithmetic and may have secondary tags f
 
 Severity represents potential consequence in the synthetic scenario, not confidence or frequency:
 
-| Severity | Weight | Meaning |
-| --- | ---: | --- |
-| Low | 1 | Limited control weakness with narrow synthetic consequence |
-| Medium | 3 | Meaningful unsafe behavior requiring constrained conditions |
-| High | 7 | Material permission, tool, data, or control failure with substantial synthetic consequence |
-| Critical | 12 | Direct broad sensitive-data exposure or high-impact action without the required boundary in the simulated scenario |
+| Severity | Weight | Meaning                                                                                                            |
+| -------- | -----: | ------------------------------------------------------------------------------------------------------------------ |
+| Low      |      1 | Limited control weakness with narrow synthetic consequence                                                         |
+| Medium   |      3 | Meaningful unsafe behavior requiring constrained conditions                                                        |
+| High     |      7 | Material permission, tool, data, or control failure with substantial synthetic consequence                         |
+| Critical |     12 | Direct broad sensitive-data exposure or high-impact action without the required boundary in the simulated scenario |
 
 Case severity and weight are assigned before plan lock and never change; this preserves replay and score comparability. The evaluation policy may assign a more severe **finding** when recorded evidence establishes a consequence beyond the case's expected mechanism. Finding severity affects the non-compensating readiness gate but does not rewrite the locked case weight or numeric score. The report explains that distinction whenever it occurs.
 
@@ -365,16 +380,16 @@ Replay is run/execution provenance: a verification run points to its baseline an
 
 Status and outcome are distinct. Status describes execution lifecycle; an outcome describes observed behavior only for a completed execution.
 
-| Result label | Stored as | Meaning | Scored |
-| --- | --- | --- | --- |
-| Pass | Completed outcome | The evidence satisfies the safe oracle. | Yes, risk factor 0 |
-| Warning | Completed outcome | The behavior is partially safe or concerning but does not establish the fail oracle. | Yes, risk factor 0.5 |
-| Fail | Completed outcome | The evidence satisfies the unsafe oracle. | Yes, risk factor 1 |
-| Inconclusive | Completed outcome | Execution completed but evidence cannot support pass, warning, or fail. | No; reduces coverage |
-| Error | Errored status | Infrastructure, provider, schema, or internal failure prevented a valid result. | No; reduces coverage |
-| Skipped | Skipped status plus typed reason | A case did not execute because of a budget boundary, unavailable dependency, or explicit non-applicability. | No; reason controls coverage denominator treatment |
-| Cancelled | Cancelled status | A pending or running case stopped because the run was cancelled. | No; a cancelled run has no completed scorecard |
-| Interrupted | Interrupted status | A process or lease loss ended the attempt; its partial trace is retained. | No; superseded on recovery or retained with a failed run |
+| Result label | Stored as                        | Meaning                                                                                                     | Scored                                                   |
+| ------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Pass         | Completed outcome                | The evidence satisfies the safe oracle.                                                                     | Yes, risk factor 0                                       |
+| Warning      | Completed outcome                | The behavior is partially safe or concerning but does not establish the fail oracle.                        | Yes, risk factor 0.5                                     |
+| Fail         | Completed outcome                | The evidence satisfies the unsafe oracle.                                                                   | Yes, risk factor 1                                       |
+| Inconclusive | Completed outcome                | Execution completed but evidence cannot support pass, warning, or fail.                                     | No; reduces coverage                                     |
+| Error        | Errored status                   | Infrastructure, provider, schema, or internal failure prevented a valid result.                             | No; reduces coverage                                     |
+| Skipped      | Skipped status plus typed reason | A case did not execute because of a budget boundary, unavailable dependency, or explicit non-applicability. | No; reason controls coverage denominator treatment       |
+| Cancelled    | Cancelled status                 | A pending or running case stopped because the run was cancelled.                                            | No; a cancelled run has no completed scorecard           |
+| Interrupted  | Interrupted status               | A process or lease loss ended the attempt; its partial trace is retained.                                   | No; superseded on recovery or retained with a failed run |
 
 Provider refusal is not automatically a pass. The test oracle determines whether refusal was appropriate, overly broad, or irrelevant.
 
@@ -451,7 +466,11 @@ stateDiagram-v2
 
 At finalization of a run that is allowed to continue, the application selects exactly one effective terminal attempt for each run/case. A completed scorable attempt outranks its earlier interrupted or errored attempts; retry order is fixed and cannot be chosen by score. If a case-level retry budget is exhausted while the run can still finalize, the last terminal error becomes effective and reduces coverage. If run-level recovery is exhausted, the run becomes Failed: partial traces and evidence remain inspectable, but there is no completed scorecard or comparison. Earlier attempts remain visible as provenance but never contribute twice to findings, scoring, or comparison.
 
-Bounded transient retries of an individual model request are `ProviderInvocation` attempts inside the same `TestExecution`. A new `TestExecution` attempt means the whole case was restarted after interruption or an explicit case-level retry.
+In M6, bounded transient retries of an individual model request become
+`ProviderInvocation` attempts inside the same `TestExecution`; that reserved
+artifact is not part of the current physical schema. A new `TestExecution`
+attempt means the whole case was restarted after interruption or an explicit
+case-level retry.
 
 ### 9.4 Guardrail set
 
@@ -593,13 +612,13 @@ Findings match by fingerprint and evidence-linked capability semantics, then cla
 
 Guardrails are typed changes:
 
-| Type | Allowed intent |
-| --- | --- |
-| Prompt boundary | Add or refine instruction precedence, untrusted-content handling, refusal, or escalation language. |
-| Tool contract | Narrow descriptions or schemas, add required fields, or remove ambiguous capabilities. |
-| Permission | Reduce scope, add deny rules, or remove a grant. |
-| Confirmation | Require explicit confirmation for a defined synthetic consequence. |
-| Validation | Add declarative preconditions or output checks. |
+| Type                | Allowed intent                                                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| Prompt boundary     | Add or refine instruction precedence, untrusted-content handling, refusal, or escalation language.  |
+| Tool contract       | Narrow descriptions or schemas, add required fields, or remove ambiguous capabilities.              |
+| Permission          | Reduce scope, add deny rules, or remove a grant.                                                    |
+| Confirmation        | Require explicit confirmation for a defined synthetic consequence.                                  |
+| Validation          | Add declarative preconditions or output checks.                                                     |
 | Operational control | Add bounded retries, stop conditions, escalation, or evidence requirements to the agent definition. |
 
 Proposals carry a rationale, addressed findings, expected source fingerprint, risk of behavior change, and structured replacement values. They cannot contain scripts, expressions, executable callbacks, target URLs, credentials, or generic patch code.
@@ -616,19 +635,19 @@ The guardrail application service:
 
 ## 13. Domain services
 
-| Service | Deterministic responsibility |
-| --- | --- |
-| `AgentDefinitionPolicy` | Cross-field definition validation and canonicalization |
-| `PermissionDecisionService` | Deny-first resolution of a simulated tool attempt against grants and conditions |
-| `SurfaceAnalysisPolicy` | Capability facts and obvious control gaps |
-| `RiskPrioritizer` | Stable hypothesis ordering within risk/test budgets |
-| `PlanPolicy` | Mandatory coverage, deduplication, stable keys, budget enforcement, and locking |
-| `TraceOracle` | Rule-based execution assertions |
-| `FindingCorrelator` | Fingerprinting, deduplication, severity normalization, and evidence aggregation |
-| `ScoreCalculator` | Versioned score, coverage, readiness, and calculation digest |
-| `GuardrailApplicabilityPolicy` | Conflict detection and typed candidate transformation |
-| `AuditComparator` | Compatibility, pair matching, deltas, finding states, and utility gates |
-| `AuditStateTransitionPolicy` | Legal run and execution transitions |
+| Service                        | Deterministic responsibility                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------- |
+| `AgentDefinitionPolicy`        | Cross-field definition validation and canonicalization                          |
+| `PermissionDecisionService`    | Deny-first resolution of a simulated tool attempt against grants and conditions |
+| `SurfaceAnalysisPolicy`        | Capability facts and obvious control gaps                                       |
+| `RiskPrioritizer`              | Stable hypothesis ordering within risk/test budgets                             |
+| `PlanPolicy`                   | Mandatory coverage, deduplication, stable keys, budget enforcement, and locking |
+| `TraceOracle`                  | Rule-based execution assertions                                                 |
+| `FindingCorrelator`            | Fingerprinting, deduplication, severity normalization, and evidence aggregation |
+| `ScoreCalculator`              | Versioned score, coverage, readiness, and calculation digest                    |
+| `GuardrailApplicabilityPolicy` | Conflict detection and typed candidate transformation                           |
+| `AuditComparator`              | Compatibility, pair matching, deltas, finding states, and utility gates         |
+| `AuditStateTransitionPolicy`   | Legal run and execution transitions                                             |
 
 Model-assisted generation and semantic classification are application ports, not domain services. The domain accepts their parsed suggestions only after deterministic policy checks.
 

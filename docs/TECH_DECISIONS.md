@@ -2,41 +2,50 @@
 
 ## 1. Decision policy
 
-This document records the technology and delivery decisions that shape Agent Auditor before implementation. Decisions are classified as:
+This document records the technology and delivery decisions that shape Agent
+Auditor. M1/M2 evidence is recorded as current implementation; later-milestone
+decisions remain explicit targets. Decisions are classified as:
 
-- **Accepted** — implementation should follow the decision unless a new architecture decision record replaces it.
-- **Validate at M1** — the product/architecture direction is fixed, but exact current versions or compatibility must be verified when installation is permitted.
-- **Deferred** — intentionally outside the MVP; no placeholder infrastructure should be built.
+- **Implemented** — present in the current repository and backed by the cited
+  configuration, code, or tests.
+- **Accepted** — implementation must follow the decision unless an architecture
+  decision record replaces it.
+- **Validate at milestone** — direction is fixed, but a later integration or
+  compatibility fact must be verified when that milestone begins.
+- **Deferred** — intentionally outside the stated milestone; no operational
+  placeholder should be presented as complete.
 
 Each accepted decision favors the smallest architecture that preserves correctness, trust boundaries, testability, and a credible path to growth.
 
 ## 2. Stack summary
 
-| Concern | Decision | Status |
-| --- | --- | --- |
-| Runtime | Active Node.js long-term-support release, pinned in repository metadata | Validate at M1 |
-| Package manager | pnpm through Corepack with a committed immutable lockfile | Accepted |
-| Application framework | Next.js App Router and React in the Node.js runtime | Validate at M1 |
-| Language | Strict TypeScript with additional safety flags | Accepted |
-| Architecture | Single-package modular monolith, lightweight DDD, ports/adapters, light CQRS | Accepted |
-| Validation | Zod at every trust boundary; domain constructors for semantic invariants | Accepted |
-| Database | Prisma ORM and SQLite with committed forward migrations | Accepted |
-| Live intelligence | Official OpenAI JavaScript SDK, planned Responses API adapter, requested `gpt-5.6` default with configuration restricted to validated GPT-5.6 identifiers/snapshots | Validate at M1/M6 |
-| Offline intelligence | Deterministic application-owned rules, templates, policies, and synthetic fixtures | Accepted |
-| Styling | Tailwind CSS, semantic HTML, design tokens, application-owned accessible components | Validate at M1 |
-| Forms | React Hook Form with Zod-derived form contracts | Validate at M1 |
-| Unit/integration tests | Vitest, Testing Library, user-event, and fast-check | Validate at M1 |
-| Browser tests | Playwright with Demo Mode and temporary SQLite | Validate at M1 |
-| Accessibility | axe-core automation plus manual WCAG 2.2 AA checks | Accepted |
-| Code quality | ESLint, Prettier, TypeScript, and dependency-cruiser import-boundary enforcement | Validate at M1 |
-| Progress | Persisted job state and resilient polling | Accepted |
-| Logging | Pino structured local allow-list logs with redaction; no hosted telemetry | Validate at M1 |
-| Evidence rendering | Escaped plain text and owned text/code viewers; no model-supplied HTML or MVP Markdown renderer | Accepted |
-| Supply-chain checks | Gitleaks, OSV-Scanner, package-manager audit, and package-manager license inventory | Validate at M1 |
-| CI runner | Repository-hosted keyless runner; exact runner selected and pinned in M1 | Validate at M1 |
-| Deployment | Loopback local Node.js process only | Accepted |
+| Concern                | Decision                                                                                                                                           | Status                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Runtime                | Node.js 24.18.0, pinned in `.node-version` and constrained by `package.json`                                                                       | Implemented                              |
+| Package manager        | pnpm 11.14.0 through Corepack with a committed immutable lockfile                                                                                  | Implemented                              |
+| Application framework  | Next.js 16.2.10 and React 19.2.7 App Router in the Node.js runtime                                                                                 | Implemented                              |
+| Language               | Strict TypeScript 6.0.3 with additional safety flags                                                                                               | Implemented                              |
+| Architecture           | Single-package modular monolith, lightweight DDD, ports/adapters, light CQRS                                                                       | Implemented foundation                   |
+| Validation             | Zod 4.4.3 at trust boundaries; domain constructors for semantic invariants                                                                         | Implemented foundation                   |
+| Database               | Prisma 7.8.0 and SQLite with a committed forward migration                                                                                         | Implemented foundation                   |
+| Live intelligence      | Official OpenAI JavaScript SDK behind a dormant server-only boundary; Responses API behavior and the allowed GPT-5.6 identifier set remain M6 work | Validate at M6                           |
+| Offline intelligence   | Deterministic application-owned rules, templates, policies, and synthetic fixtures                                                                 | Foundation implemented; full engine M3   |
+| Styling                | Tailwind CSS 4.3.3, semantic HTML, design tokens, and application-owned accessible components                                                      | Implemented foundation                   |
+| Forms                  | React Hook Form 7.81.0 with Zod-derived form contracts                                                                                             | Implemented                              |
+| Unit/integration tests | Vitest 4.1.10, Testing Library, and fast-check property tests; user-event is installed for later interaction suites                                | Implemented foundation                   |
+| Browser tests          | Playwright 1.61.1 with Demo Mode and isolated temporary SQLite                                                                                     | Implemented smoke path                   |
+| Accessibility          | axe-core component automation plus manual WCAG 2.2 AA release checks                                                                               | Foundation implemented; full journey M7  |
+| Code quality           | ESLint 9, Prettier 3, TypeScript, and repository-owned source-scanning architecture tests                                                          | Implemented                              |
+| Progress               | Persisted job state now; automatic worker lifecycle and resilient browser polling in M3                                                            | Foundation implemented                   |
+| Logging                | Pino 10.3.1 structured local allow-list logs with redaction; no hosted telemetry                                                                   | Implemented                              |
+| Evidence rendering     | Escaped plain text and owned text/code viewers; no model-supplied HTML or MVP Markdown renderer                                                    | Accepted                                 |
+| Supply-chain checks    | Offline repository/secret guard, production-license allow-list, Gitleaks history scan, and OSV lockfile scan                                       | Implemented foundation; package audit M7 |
+| CI runner              | GitHub-hosted `ubuntu-24.04` quality lane and `windows-2025` compatibility lane                                                                    | Implemented                              |
+| Deployment             | Loopback local Node.js process only                                                                                                                | Implemented                              |
 
-No dependency is installed and no version is guessed during the planning prompt.
+Exact dependency versions are pinned in `package.json` and `pnpm-lock.yaml`.
+The table distinguishes installed foundations from later behavior; installing a
+library alone does not claim that every planned suite or product path exists.
 
 ## 3. Architectural decisions
 
@@ -101,7 +110,7 @@ No dependency is installed and no version is guessed during the planning prompt.
 
 ### TD-005 — Use Next.js App Router in the Node.js runtime
 
-**Status:** Validate at M1
+**Status:** Implemented in M1
 
 **Decision:** Use Next.js for local server rendering, route composition, and HTTP route handlers. Server components are the default; client components are limited to forms, progress/cancellation, filtering, and genuinely interactive visualizations. Do not use an edge runtime.
 
@@ -150,7 +159,7 @@ No dependency is installed and no version is guessed during the planning prompt.
 
 ### TD-008 — Use Prisma with SQLite behind repositories
 
-**Status:** Accepted; representation details validate at M1
+**Status:** Implemented foundation; future migrations repeat validation
 
 **Decision:** SQLite is the local database and Prisma is the data-access/migration tool. Infrastructure repositories map records to domain objects. Core metadata is relational; heterogeneous payloads use canonical schema-versioned JSON text.
 
@@ -166,7 +175,10 @@ No dependency is installed and no version is guessed during the planning prompt.
 
 **Rejected for MVP:** An in-memory-only store, browser storage, a hosted database, or speculative multi-database support.
 
-**Validate at M1:** Current SQLite JSON/enum behavior, foreign-key configuration, migration-level checks, and write-ahead logging performance. Correctness will not depend on native JSON operators or WAL.
+**M1/M2 evidence:** The committed migration and integration harness validate
+canonical JSON text, foreign-key activation, migration checks, referential
+actions, and transaction behavior. WAL remains an optional M3 benchmark;
+correctness does not depend on native JSON operators or WAL.
 
 ### TD-009 — Use Zod at boundaries and domain policies for meaning
 
@@ -204,7 +216,7 @@ No dependency is installed and no version is guessed during the planning prompt.
 
 ### TD-012 — Plan the OpenAI integration around the Responses API
 
-**Status:** Validate at M1/M6
+**Status:** Server-only boundary implemented; API behavior validates at M6
 
 **Decision:** Use the official OpenAI JavaScript SDK behind server-only infrastructure. The planned API boundary is the Responses API. The requested default model reference is `gpt-5.6`; configuration accepts only identifiers or snapshots verified to be GPT-5.6 during implementation.
 
@@ -270,6 +282,12 @@ No dependency is installed and no version is guessed during the planning prompt.
 
 **Decision:** A local coordinator leases SQLite job rows, runs one audit by default, checkpoints after phases/cases, and reconciles expired leases. It implements `AuditJobPort`; no external queue exists. Provider work occurs outside transactions.
 
+**Current implementation:** M2 persists the run/job pair and implements
+conditional leases, renewal, cancellation, bounded recovery, safe terminal
+failure, and explicitly invocable reconciliation. The coordinator can be
+called deliberately, but no automatic worker loop or startup/shutdown hook is
+wired. M3 adds that process lifecycle and phase/case checkpoint orchestration.
+
 **Why:** Audits can outlive an HTTP request and must survive page refresh. A local database lease provides recoverability without introducing infrastructure outside MVP scope.
 
 **Consequences:** Process startup and shutdown behavior require integration and failure-injection tests. SQLite single-writer constraints cap concurrency. A separately scaled worker would require a later adapter and deployment decision.
@@ -279,6 +297,11 @@ No dependency is installed and no version is guessed during the planning prompt.
 **Status:** Accepted
 
 **Decision:** The browser creates a run, receives an ID, and polls a typed run projection with increasing intervals. Commands cancel or retry idempotently. Persisted state, not an in-memory stream, is authoritative.
+
+**Current implementation:** Audit creation returns an accepted persisted run.
+The M1/M2 server-rendered page reads that state once per request and refreshes
+after cancellation; it does not poll. Increasing-interval polling starts with
+the M3 execution UI.
 
 **Why:** Polling is robust across refresh, temporary disconnect, and process reconciliation. It is enough for phase/case progress and easier to validate than a long-lived stream.
 
@@ -304,13 +327,18 @@ No dependency is installed and no version is guessed during the planning prompt.
 
 **Decision:** Server components render read-oriented pages. Client components handle multi-step forms, polling/cancel, filters, accessible dialogs/disclosures, and minimal charts. No global state library is selected initially; server data remains in route/query projections and local interaction state remains near the component.
 
+**Current implementation:** Client islands cover validated agent creation,
+queueing, and cancellation with explicit server refresh. Polling, report
+filters, dialogs, and charts are later-milestone consumers of this decision,
+not current foundation behavior.
+
 **Why:** This reduces client JavaScript and prevents a second application state model. Audit truth already lives in SQLite and application queries.
 
 **Consequences:** Mutations invalidate or refresh server projections explicitly. A client query library may be added only if polling/cache behavior becomes materially complex and is justified by an ADR.
 
 ### TD-021 — Use Tailwind CSS and application-owned accessible components
 
-**Status:** Validate at M1
+**Status:** Implemented foundation in M1
 
 **Decision:** Define security-oriented visual tokens and compose semantic native HTML into small owned components. Use Tailwind for styling. Prefer native controls and progressively enhance them. Add a focused accessible primitive dependency only if a tested interaction cannot be delivered reliably with native elements, and record that addition.
 
@@ -320,7 +348,7 @@ No dependency is installed and no version is guessed during the planning prompt.
 
 ### TD-022 — Use React Hook Form for the target workflow
 
-**Status:** Validate at M1
+**Status:** Implemented foundation in M1
 
 **Decision:** Use React Hook Form for prompt/tool/permission forms with Zod-derived client feedback. Submit canonical DTOs and reparse them on the server.
 
@@ -376,19 +404,28 @@ No dependency is installed and no version is guessed during the planning prompt.
 
 **Status:** Accepted
 
-| Layer | Tools | Required coverage |
-| --- | --- | --- |
-| Domain | Vitest, fast-check | Value objects, invariants, transitions, score properties, typed coverage denominators, high-impact surface limitations, finding-resolution proof, fingerprinting, comparison |
-| Application | Vitest with fakes | Purpose-specific plan orchestration, idempotency, budgets, cancellation, bounded recovery exhaustion, supplemental linkage, retries, error mapping |
-| Persistence | Vitest with real temporary SQLite | Migrations, constraints, mappers, atomic job/run pairs, per-execution evidence checkpoints, incompatible comparisons, leases, stale provider reconciliation, purge, restart recovery |
-| Provider/simulator contracts | Vitest with synthetic fixtures | Valid/malformed output, tool attempts, denial, timeout, unavailable model, redaction |
-| Presentation/API | Testing Library, user-event, axe, route contract tests | Forms, state variants, safe rendering, focus, keyboard, accessible names, Host/Origin/nonce/CORS enforcement |
-| End to end | Playwright | Complete keyless Demo, guardrails, verification, deletion, interruption |
-| Manual release | Browser and assistive-technology checks | Live Mode smoke, keyboard, screen reader, reduced motion, cross-platform setup |
+| Layer                        | Tools                                                  | Required coverage                                                                                                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Domain                       | Vitest and fast-check                                  | Value objects, deterministic canonical serialization properties, invariants, transitions, score properties, typed coverage denominators, high-impact surface limitations, finding-resolution proof, fingerprinting, comparison |
+| Application                  | Vitest with fakes                                      | Purpose-specific plan orchestration, idempotency, budgets, cancellation, bounded recovery exhaustion, supplemental linkage, retries, error mapping                                                                             |
+| Persistence                  | Vitest with real temporary SQLite                      | Current agent/run/job migrations, constraints, mappers, atomic pairs, leases, purge, and recovery; result checkpoints and stale provider reconciliation arrive with their owning milestones                                    |
+| Provider/simulator contracts | Vitest with synthetic fixtures                         | Valid/malformed output, tool attempts, denial, timeout, unavailable model, redaction                                                                                                                                           |
+| Presentation/API             | Testing Library, user-event, axe, route contract tests | Forms, state variants, safe rendering, focus, keyboard, accessible names, Host/Origin/nonce/CORS enforcement                                                                                                                   |
+| End to end                   | Playwright                                             | Complete keyless Demo, guardrails, verification, deletion, interruption                                                                                                                                                        |
+| Manual release               | Browser and assistive-technology checks                | Live Mode smoke, keyboard, screen reader, reduced motion, cross-platform setup                                                                                                                                                 |
 
 Broad visual snapshot testing is not the primary strategy. Golden artifacts are appropriate for deterministic Demo plans, traces, findings, and calculations; changes require intentional review.
 
-Domain/application critical paths target 90% branch coverage and the repository overall targets 80%. A percentage never excuses an untested trust boundary or state transition.
+The current `pnpm test:coverage` configuration enforces 75% global branch
+coverage and 80% functions, lines, and statements when that command is run.
+CI executes that coverage gate through `pnpm verify`. The release target remains
+at least 90% branch coverage for critical domain/application modules and 80%
+overall, with explicit per-module gates added before M7 acceptance. A
+percentage never excuses an
+untested trust boundary or state transition. Fast-check already exercises
+deterministic canonical serialization properties. Installed user-event and
+browser axe adapters remain reserved for the interaction and full-journey
+suites that need them; installation alone is not counted as coverage.
 
 ### TD-028 — Keep automated CI keyless and deterministic
 
@@ -406,7 +443,7 @@ Domain/application critical paths target 90% branch coverage and the repository 
 
 **Status:** Accepted
 
-The planned pipeline order is:
+The target release pipeline order is:
 
 ```mermaid
 flowchart LR
@@ -419,15 +456,24 @@ flowchart LR
     E2E --> SCAN["Secret + dependency + license review"]
 ```
 
-Planned scripts, finalized during M1:
+Current scripts established during M1 include:
 
 - `format` and `format:check`;
-- `lint` and an architecture-boundary check;
+- `lint` and `test:architecture` for repository-owned source-scanning boundary checks;
 - `typecheck`;
 - `db:generate`, `db:validate`, `db:migrate`, and isolated test-database commands;
-- `test`, `test:unit`, `test:integration`, `test:security`, and `test:coverage`;
+- `test`, focused unit/application/integration/contract/architecture/security/accessibility scripts, and `test:coverage`;
 - `test:e2e` and accessibility checks; and
 - `build` and `start`.
+
+The current GitHub Actions workflow performs the frozen install, offline
+repository/secret and production-license guards, Prisma
+generation/validation/migration, coverage-gated keyless quality sequence,
+production build, and Demo browser smoke on `ubuntu-24.04`, with a lighter
+`windows-2025` lane. A parallel keyless supply-chain job runs a
+checksum-verified Gitleaks history scan and the pinned OSV Scanner action
+against the lockfile. Package-manager audit and sanitized artifact upload
+remain M7 work.
 
 Pipeline rules:
 
@@ -435,7 +481,9 @@ Pipeline rules:
 - Migrations run against a fresh temporary database and every earlier committed schema baseline that exists; v1 begins with the empty baseline.
 - Production build has no OpenAI key.
 - Browser tests start the production build, not only the development server.
-- Failure artifacts are sanitized; databases, environment files, and prompts are not uploaded.
+- Any M7 failure/coverage artifact upload must sanitize content; databases,
+  environment files, and prompts must never be uploaded. The current workflow
+  uploads no artifacts.
 - Superseded branch runs may be cancelled; the main branch repeats the full keyless suite.
 - Use a primary environment plus a Windows smoke lane because local-first path and process behavior must be portable.
 - There is no deploy stage.
@@ -466,31 +514,44 @@ Pipeline rules:
 
 The following require new evidence and are not implemented as empty abstractions:
 
-| Deferred topic | Trigger to revisit |
-| --- | --- |
-| Authentication and multi-tenancy | A hosted or shared-user product charter |
-| Cloud deployment and external queue | A requirement to run outside one trusted local process |
-| Real or remote agent connectors | A revised threat model and a protocol that preserves tool interception |
-| Real tool execution | Explicit mission change; it is outside the current safety boundary |
-| Multiple model providers | Demonstrated user requirement and provider-neutral contract review |
-| Plugin/rule-pack runtime | A safe declarative extension format and supply-chain model |
-| Encrypted local database | User demand and a cross-platform key-management design |
-| Streaming progress | Polling fails measured UX/performance needs |
-| Global client state/query framework | Local component/polling state becomes demonstrably complex |
-| Chart/component framework | Native/owned accessible components fail a measured requirement |
-| Export formats | Core evidence/remediation/verification journey is complete |
+| Deferred topic                      | Trigger to revisit                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| Authentication and multi-tenancy    | A hosted or shared-user product charter                                |
+| Cloud deployment and external queue | A requirement to run outside one trusted local process                 |
+| Real or remote agent connectors     | A revised threat model and a protocol that preserves tool interception |
+| Real tool execution                 | Explicit mission change; it is outside the current safety boundary     |
+| Multiple model providers            | Demonstrated user requirement and provider-neutral contract review     |
+| Plugin/rule-pack runtime            | A safe declarative extension format and supply-chain model             |
+| Encrypted local database            | User demand and a cross-platform key-management design                 |
+| Streaming progress                  | Polling fails measured UX/performance needs                            |
+| Global client state/query framework | Local component/polling state becomes demonstrably complex             |
+| Chart/component framework           | Native/owned accessible components fail a measured requirement         |
+| Export formats                      | Core evidence/remediation/verification journey is complete             |
 
 ## 14. Implementation-time validation checklist
 
 These checks do not reopen the architecture unless they fail materially:
 
-1. Pin a mutually compatible set of current runtime, framework, ORM, validation, SDK, styling, and test versions.
-2. Confirm the exact GPT-5.6 identifier set, availability, Responses API request shape, structured-output behavior, tool-call representation, cancellation support, and usage metadata; reject non-GPT-5.6 identifiers for the named mode.
-3. Confirm Prisma's current SQLite behavior for canonical JSON text, check constraints, referential actions, transaction isolation, and generated client location.
-4. Verify the Next.js Node lifecycle can start and stop the in-process coordinator exactly once in development, test, and production builds.
-5. Benchmark polling, SQLite job leases, optional WAL, trace batch size, and the initial 15-second Demo target.
-6. Run the secret-in-client-bundle test before any Live UI is added.
-7. Validate native component accessibility before approving any additional UI dependency.
-8. Select and pin the repository-hosted CI runner and confirm the clean-install path on the primary development platforms; record supported versions in release documentation.
+1. **Completed in M1:** pin a mutually compatible runtime, framework, ORM,
+   validation, SDK, styling, and test set in repository metadata and the
+   immutable lockfile.
+2. **M6:** confirm the exact GPT-5.6 identifier set, availability, Responses
+   API request shape, structured-output behavior, tool-call representation,
+   cancellation support, and usage metadata; reject non-GPT-5.6 identifiers for
+   the named mode.
+3. **Completed for the current schema:** verify Prisma SQLite canonical JSON,
+   migration checks, referential actions, transactions, and generated-client
+   behavior through the committed migration and integration tests. Repeat for
+   every future migration.
+4. **M3:** verify that the Next.js Node lifecycle starts and stops the
+   in-process coordinator exactly once in development, test, and production.
+5. **M3/M7:** benchmark polling, SQLite job leases, optional WAL, trace batch
+   size, and the initial 15-second Demo target.
+6. **M6:** run the secret-in-client-bundle test before any Live UI is added.
+7. **Ongoing/M7:** expand native-component checks to the complete journey and
+   finish manual keyboard/screen-reader validation before release.
+8. **Completed in M1:** use pinned GitHub-hosted `ubuntu-24.04` and
+   `windows-2025` runners. Record supported versions and clean-install evidence
+   in release documentation.
 
 If a validation fails, record the evidence and choose the narrowest replacement that preserves the domain, trust boundaries, and public behavior.

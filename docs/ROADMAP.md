@@ -30,16 +30,16 @@ flowchart LR
 
 ## 3. Milestone overview
 
-| Milestone | Status | Product outcome |
-| --- | --- | --- |
-| M0 — Planning foundation | Documentation complete; owner approval pending | The owner can approve a coherent charter, architecture, domain language, data model, delivery sequence, and decision log. |
-| M1 — Engineering foundation | Planned | A clean checkout can install, validate, test, migrate, build, and start a strict local application without an API key. |
-| M2 — Domain and persistence | Planned | Core invariants and lifecycle records are executable, tested, and safely persisted in SQLite. |
-| M3 — Target workflow and Demo engine | Planned | A user can define an agent and complete a real deterministic audit pipeline with simulated tools. |
-| M4 — Evidence, findings, and scoring | Planned | The user receives a traceable, accessible report with transparent coverage and scoring. |
-| M5 — Guardrails and verification | Planned | A user can create a reviewed guarded revision and see an honest paired comparison. |
-| M6 — Live GPT-5.6 Mode | Planned | The same workflow can use the OpenAI API with bounded, validated, privacy-aware behavior. |
-| M7 — Release hardening | Planned | The repository is reliable, accessible, secure, documented, and ready for public hackathon review. |
+| Milestone                            | Status                                                       | Product outcome                                                                                                             |
+| ------------------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| M0 — Planning foundation             | Complete                                                     | The owner approved a coherent charter, architecture, domain language, data model, delivery sequence, and decision log.      |
+| M1 — Engineering foundation          | Implemented in current repository                            | A clean checkout can install, validate, test, migrate, build, and start a strict local application without an API key.      |
+| M2 — Domain and persistence          | Foundation implemented; later-artifact repositories deferred | Core domain policies plus agent and audit-run/job lifecycle records are executable, tested, and safely persisted in SQLite. |
+| M3 — Target workflow and Demo engine | Planned                                                      | A user can define an agent and complete a real deterministic audit pipeline with simulated tools.                           |
+| M4 — Evidence, findings, and scoring | Planned                                                      | The user receives a traceable, accessible report with transparent coverage and scoring.                                     |
+| M5 — Guardrails and verification     | Planned                                                      | A user can create a reviewed guarded revision and see an honest paired comparison.                                          |
+| M6 — Live GPT-5.6 Mode               | Planned                                                      | The same workflow can use the OpenAI API with bounded, validated, privacy-aware behavior.                                   |
+| M7 — Release hardening               | Planned                                                      | The repository is reliable, accessible, secure, documented, and ready for public hackathon review.                          |
 
 ## 4. M0 — Planning foundation
 
@@ -110,36 +110,68 @@ Business schema, full routes, audit logic, visual polish, and live API calls.
 
 ### Outcome
 
-Implement the framework-independent language and state machines that make later vertical slices safe.
+Establish the framework-independent language, state policies, and durable
+foundation needed by later vertical slices. The current repository implements
+that foundation; it does not claim that every future result artifact already
+has an operational repository.
 
-### Scope
+### Implemented foundation scope
 
-- Agent profile, immutable agent revision, prompt/tool/permission value objects, canonicalization, and fingerprints.
-- Audit plan, stable test keys, hypothesis, run, execution, finding, evidence, scorecard, guardrail, and comparison domain types.
-- Run and execution transition policies, cancellation/interruption semantics, and readiness/scoring policies.
-- Application ports for repositories, transactions, clocks, IDs, model roles, simulation, job coordination, and logging.
-- Prisma schema and migrations for the conceptual data model.
-- Explicit persistence mappers and read projections.
-- Job lease/checkpoint model, startup reconciliation, idempotent commands, and short transaction boundaries.
-- Synthetic builders and fixtures; no live provider implementation.
+- Agent profile, immutable agent revision, prompt/tool/permission value
+  objects, canonicalization, fingerprints, transactional persistence, and read
+  projections.
+- Foundation domain values and policies for plans, stable test keys, runs,
+  executions, evidence, findings, scoring, guardrails, and comparisons. Typed
+  planner hypotheses remain an M3 concern.
+- Run/execution transitions, cancellation/interruption semantics,
+  readiness/scoring policies, and application ports for persistence, clocks,
+  IDs, model roles, simulation, coordination, and logging.
+- A committed Prisma schema and migration for the conceptual audit artifacts,
+  plus operational repositories/mappers for the agent catalog and audit
+  run/job lifecycle. `ProviderInvocation` remains an M6-reserved target table.
+- Atomic idempotent run/job creation, conditional leases, durable
+  cancellation, bounded recovery, and an explicitly invocable expired-lease
+  reconciliation use case. Automatic worker/startup wiring remains M3.
+- Synthetic seed agents, deterministic fakes, and keyless tests; no live
+  provider execution.
 
-### Exit criteria
+### Current acceptance evidence
 
-- Domain unit and property tests prove documented invariants, score bounds, monotonic deductions, stable fingerprints, and impossible-transition rejection.
-- Coverage tests prove typed skip reasons reproduce denominator decisions, incomplete high-impact surfaces force provisional/review states, and security/utility weights remain independent.
-- Repository tests use real temporary SQLite files and verify foreign keys, uniqueness, indexes, cascades/restrictions, transactions, and deletion behavior.
-- Completed artifacts cannot be modified through repositories.
-- Stale running jobs and provider invocations reconcile safely after simulated restart; recovery exhaustion reaches a terminal pair.
-- Invalid schema-versioned JSON cannot enter a domain object.
-- No transaction spans a fake long-running provider call.
+- Example-based domain/application tests cover documented state transitions,
+  score bounds, fingerprints, skip/coverage behavior, and comparison rules.
+- Repository tests use isolated temporary SQLite databases and exercise the
+  current agent and run/job transactions, constraints, purge behavior, and
+  recovery paths.
+- Current persistence mappers reject invalid schema-versioned JSON before it
+  enters a domain object.
+- The coordinator never holds a transaction across provider-shaped work, and
+  deliberate foundation execution fails truthfully instead of fabricating a
+  completed audit.
 
-### Risk retired
+### Deferred completion work
 
-Mutable audit history, incomparable results, floating-point score drift, database/domain coupling, and unrecoverable run states.
+- M3 adds typed hypotheses, the planner, automatic coordinator lifecycle and
+  startup reconciliation, execution checkpoints, and plan/execution/trace
+  repositories.
+- M4 adds operational evidence, finding, and scorecard repositories plus their
+  immutability/replay tests; M5 does the same for guardrails and comparisons.
+- Property-based coverage is added with the engine/result policies it is meant
+  to exercise; the installed property-test library alone is not acceptance
+  evidence.
+- M6 adds `ProviderInvocation` through a forward migration, including stale
+  invocation reconciliation and its privacy-purge guard.
+
+### Risk reduced by the current foundation
+
+Mutable agent history, floating-point score drift, framework coupling inside
+domain code, duplicate audit requests, and unrecoverable queued/leased job
+state.
 
 ### Explicitly deferred
 
-Complete UI, adaptive model suggestions, polished report, and guardrail generation.
+Complete audit execution, adaptive model suggestions, polished reports,
+guardrail generation/persistence, comparison persistence, and Live provider
+behavior.
 
 ## 7. M3 — Target workflow and deterministic Demo engine
 
@@ -253,6 +285,8 @@ Add model-backed adaptive intelligence without weakening the deterministic pipel
 - Startup configuration status, server-only API key, a model reference restricted to implementation-validated GPT-5.6 identifiers or snapshots, and explicit pre-run consent.
 - Separate planner, target, evaluator, and guardrail contexts with purpose-specific ports.
 - Strict structured response schemas, bounded repair, timeout, abort, concurrency, retry, and usage metadata.
+- A persisted `ProviderInvocation` record added by forward migration, with safe
+  digests/usage metadata, bounded attempts, process ownership, and deadlines.
 - Context minimization and untrusted-data delimiting for prompts, tools, and traces.
 - Model tool-call interception through the existing simulator only.
 - Safe provider error taxonomy for unavailable model, authentication, rate limit, timeout, invalid output, and cancellation.
@@ -268,6 +302,8 @@ Add model-backed adaptive intelligence without weakening the deterministic pipel
 - Tool attempts still terminate in the closed simulator registry.
 - Provider-hosted and built-in model tools are disabled and rejected by adapter contract tests.
 - Provider timeouts, rate limits, cancellation, and unavailable access produce recoverable, actionable UI states.
+- Stale `Started` provider invocations reconcile after restart, and an in-flight
+  invocation blocks privacy purge until it is safely terminalized.
 - The exact GPT-5.6 model identifier and API features are validated and documented for the pinned SDK version.
 
 ### Risk retired

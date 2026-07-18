@@ -1,0 +1,27 @@
+title = "Agent Auditor Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Exact synthetic credentials used by redaction and non-disclosure tests"
+regexTarget = "match"
+regexes = [
+  '''internal-path-and-secret-canary''',
+  '''sk-proj-never-return-this-value''',
+  '''sk-proj-abcdefghijklmnopqrstuv''',
+  '''sk-1234567890abcdefghijkl''',
+  '''credential-material''',
+  '''not-a-credential''',
+  '''unit-test-placeholder''',
+  '''password:very-secret''',
+]
+
+[[allowlists]]
+description = "Exact synthetic private-key fixture in the redaction test"
+condition = "AND"
+regexTarget = "line"
+paths = ['''^tests/security/redaction\.test\.ts$''']
+regexes = [
+  '''^\s*"\x2d\x2d\x2d\x2d\x2dBEGIN PRIVATE KEY\x2d\x2d\x2d\x2d\x2d\x5cncanary-private-material\x5cn\x2d\x2d\x2d\x2d\x2dEND PRIVATE KEY\x2d\x2d\x2d\x2d\x2d",$''',
+]

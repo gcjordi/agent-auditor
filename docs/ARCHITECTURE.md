@@ -4,6 +4,12 @@
 
 Agent Auditor will be a **local-first modular monolith** built with strict TypeScript and lightweight Domain Driven Design. A single Node.js application will serve the web UI, expose local HTTP endpoints, coordinate audit jobs, and persist to SQLite. The design uses ports and adapters so OpenAI, Demo Mode, Prisma, the job coordinator, clocks, and identifiers remain replaceable infrastructure details.
 
+**Implementation status:** M1/M2 implements the modular boundaries, local API,
+SQLite repositories, durable job lifecycle, bounded coordinator foundation,
+and truthful queued-run UI. Sections describing execution, evidence, reports,
+polling, automatic startup recovery, remediation persistence, or Live behavior
+are target architecture for later milestones unless explicitly labeled current.
+
 The monolith is a deliberate product decision: it minimizes operational surface for a local MVP while preserving the module and dependency boundaries expected in a durable SaaS codebase. It is not a license to mix layers.
 
 ## 2. Architectural drivers
@@ -33,16 +39,16 @@ flowchart LR
 
 ### 3.1 Trust classification
 
-| Zone | Classification | Rules |
-| --- | --- | --- |
-| Local application code | Trusted computing base | Pinned dependencies, strict checks, no dynamic target code |
-| Local browser | Partially trusted presentation client | No secrets; server revalidates every request |
-| SQLite file | Sensitive local storage | Verbatim revision text plus sanitized traces/evidence; no encryption claim; controlled deletion; ignored by version control |
-| Agent definition | Untrusted content | Size/depth limits, schema parsing, never promoted to auditor instructions |
-| Model responses | Untrusted content | Zod validation, output budgets, safe error handling, escaped display |
-| Tool declarations and calls | Untrusted content | Closed name resolution, schema validation, deny by default, synthetic response only |
-| Environment configuration | Trusted server input after validation | API key never serialized, logged, or persisted |
-| OpenAI API | Optional external processor | Live Mode consent, minimized payload, timeouts, no implicit fallback |
+| Zone                        | Classification                        | Rules                                                                                                                       |
+| --------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Local application code      | Trusted computing base                | Pinned dependencies, strict checks, no dynamic target code                                                                  |
+| Local browser               | Partially trusted presentation client | No secrets; server revalidates every request                                                                                |
+| SQLite file                 | Sensitive local storage               | Verbatim revision text plus sanitized traces/evidence; no encryption claim; controlled deletion; ignored by version control |
+| Agent definition            | Untrusted content                     | Size/depth limits, schema parsing, never promoted to auditor instructions                                                   |
+| Model responses             | Untrusted content                     | Zod validation, output budgets, safe error handling, escaped display                                                        |
+| Tool declarations and calls | Untrusted content                     | Closed name resolution, schema validation, deny by default, synthetic response only                                         |
+| Environment configuration   | Trusted server input after validation | API key never serialized, logged, or persisted                                                                              |
+| OpenAI API                  | Optional external processor           | Live Mode consent, minimized payload, timeouts, no implicit fallback                                                        |
 
 The local machine and user are trusted for the MVP; the target content is not. Loopback binding does not eliminate malicious-origin, cross-site request, or DNS-rebinding risk. The MVP therefore validates the `Host` and `Origin` of requests, exposes no permissive CORS policy, accepts state changes only through JSON endpoints with a same-origin custom-header nonce, and combines that nonce with idempotency keys. Live consent is bound to the target fingerprint, exact model identifier, and transmission-summary digest for one requested run. Binding beyond loopback additionally requires authentication and a new architecture decision.
 
@@ -79,13 +85,13 @@ flowchart TD
     B --> I
 ```
 
-| Layer | Responsibility | May depend on | Must not contain |
-| --- | --- | --- | --- |
-| Domain | Entities, value objects, aggregates, policies, state transitions, deterministic scoring and comparison | Standard TypeScript and a tiny shared domain kernel | React, Next.js, Zod boundary schemas, Prisma, SDK types, HTTP, environment access |
-| Application | Commands, queries, orchestration, transaction boundaries, DTOs, ports, authorization-free local use-case policy | Domain | UI rendering, SQL/Prisma calls, provider-specific requests |
-| Infrastructure | Prisma repositories and projections, OpenAI/Demo adapters, simulation, job coordination, configuration, clocks, IDs, logging | Application ports and Domain types | Business decisions that belong in domain policies |
-| Presentation | Routes, forms, controllers, view models, accessible components, HTTP translation | Application commands/queries and presentation contracts | Prisma records, SDK calls, score calculation, audit orchestration |
-| Bootstrap | Constructs concrete adapters and provides request/job scopes | All outer-layer constructors | Business rules or feature-specific branching |
+| Layer          | Responsibility                                                                                                               | May depend on                                           | Must not contain                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Domain         | Entities, value objects, aggregates, policies, state transitions, deterministic scoring and comparison                       | Standard TypeScript and a tiny shared domain kernel     | React, Next.js, Zod boundary schemas, Prisma, SDK types, HTTP, environment access |
+| Application    | Commands, queries, orchestration, transaction boundaries, DTOs, ports, authorization-free local use-case policy              | Domain                                                  | UI rendering, SQL/Prisma calls, provider-specific requests                        |
+| Infrastructure | Prisma repositories and projections, OpenAI/Demo adapters, simulation, job coordination, configuration, clocks, IDs, logging | Application ports and Domain types                      | Business decisions that belong in domain policies                                 |
+| Presentation   | Routes, forms, controllers, view models, accessible components, HTTP translation                                             | Application commands/queries and presentation contracts | Prisma records, SDK calls, score calculation, audit orchestration                 |
+| Bootstrap      | Constructs concrete adapters and provides request/job scopes                                                                 | All outer-layer constructors                            | Business rules or feature-specific branching                                      |
 
 Dependency rules will be enforced by linted import boundaries and path aliases. Infrastructure implements inward-facing ports; the application layer never locates adapters through a global service locator. Manual factories provide dependency injection without a container framework.
 
@@ -123,13 +129,12 @@ flowchart TB
 
 - The server binds to loopback by default.
 - A `POST` command creates an audit and its job atomically, then returns the audit ID.
-- A local coordinator leases queued jobs from SQLite and executes a bounded number in process.
-- The UI polls persisted progress; it never depends on an in-memory event to remain correct.
-- Every phase and completed case is checkpointed, including normalized per-execution evidence. No database transaction remains open during a model call.
-- On startup, an expired lease atomically marks its active execution attempt and run Interrupted and preserves partial traces. The job moves to `WAITING_RETRY` only when the bounded recovery policy says another attempt is eligible; otherwise run/job become Failed/`TERMINAL`, or Cancelled/`TERMINAL` when cancellation was requested. Eligible recovery creates a new execution attempt and never appends to the interrupted row.
-- Startup also fails stale provider-invocation records from a prior process, including interrupted post-audit guardrail advice, using their persisted process identity and deadline; no orphaned `Started` call can block deletion indefinitely.
-- Default audit concurrency is one job, with at most two concurrent Live test cases inside that job. These limits are configuration, not user-provided code.
-- Cancellation is cooperative: the application sets a durable cancellation request, aborts active provider calls where supported, and stops before the next phase/case boundary.
+- The current coordinator can lease queued jobs through a validated one-to-four-worker pool and terminalizes deliberately invoked foundation work with `AUDIT_ENGINE_NOT_IMPLEMENTED`; no worker loop starts automatically and queued UI requests remain queued.
+- Durable cancellation, conditional leasing, lease renewal, expired-lease reconciliation, explicit requeue, and safe terminal failure are implemented behind `AuditJobPort` and tested against SQLite.
+- The current server-rendered run page reads persisted state once per request. Polling begins with the M3 execution UI; it will never depend on an in-memory event for correctness.
+- M3 adds automatic coordinator startup/shutdown wiring, phase/case checkpoints, and startup invocation of the existing reconciliation use case. No database transaction will remain open during model work.
+- `ProviderInvocation` persistence and stale-call recovery are intentionally deferred until provider execution exists; no orphaned provider record can exist in this foundation.
+- Cancellation of queued work is immediate and atomic. Later active execution uses the durable cancellation signal, aborts provider calls where supported, and stops at a safe phase/case boundary.
 
 This coordinator is behind `AuditJobPort`; a future process boundary can replace it without changing use cases or domain rules. The MVP does not introduce an external queue.
 
@@ -137,22 +142,22 @@ This coordinator is behind `AuditJobPort`; a future process boundary can replace
 
 ### 6.1 Components
 
-| Component | Layer | Responsibility |
-| --- | --- | --- |
-| `AgentDefinitionPolicy` | Domain | Validates semantic consistency after Zod shape parsing |
-| `SurfaceAnalysisPolicy` | Domain | Derives deterministic capability facts and control gaps from a validated revision |
-| `SurfaceAnalyzer` | Application | Orchestrates the domain policy and optional semantic enrichment port without changing deterministic facts |
-| `RiskPrioritizer` | Domain | Ranks original risk hypotheses within the configured budget |
-| `TestPlanner` | Application | Combines mandatory, capability-specific, utility, and optional model-suggested cases |
-| `PlanPolicy` | Domain | Deduplicates, validates coverage, enforces bounds, and locks a plan |
-| `TargetRunner` | Application | Runs an isolated conversation and routes all tool attempts to the interceptor |
-| `ToolCallInterceptor` | Application | Orchestrates call parsing and a domain permission decision, then invokes `ToolSimulationPort`; concrete simulators remain Infrastructure |
-| `TraceEvaluator` | Application | Applies deterministic oracles first and structured semantic evaluation only where needed |
-| `FindingCorrelator` | Domain | Groups repeated symptoms and creates stable evidence-backed findings |
-| `ScoreCalculator` | Domain | Produces versioned deterministic scores, coverage, and readiness |
-| `GuardrailApplicabilityPolicy` | Domain | Validates typed changes, conflicts, source fingerprints, and candidate invariants |
-| `GuardrailDesigner` | Application | Orchestrates optional advice and submits parsed proposals to the domain applicability policy |
-| `AuditComparator` | Domain | Matches stable tests/findings and calculates paired deltas and utility changes |
+| Component                      | Layer       | Responsibility                                                                                                                           |
+| ------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `AgentDefinitionPolicy`        | Domain      | Validates semantic consistency after Zod shape parsing                                                                                   |
+| `SurfaceAnalysisPolicy`        | Domain      | Derives deterministic capability facts and control gaps from a validated revision                                                        |
+| `SurfaceAnalyzer`              | Application | Orchestrates the domain policy and optional semantic enrichment port without changing deterministic facts                                |
+| `RiskPrioritizer`              | Domain      | Ranks original risk hypotheses within the configured budget                                                                              |
+| `TestPlanner`                  | Application | Combines mandatory, capability-specific, utility, and optional model-suggested cases                                                     |
+| `PlanPolicy`                   | Domain      | Deduplicates, validates coverage, enforces bounds, and locks a plan                                                                      |
+| `TargetRunner`                 | Application | Runs an isolated conversation and routes all tool attempts to the interceptor                                                            |
+| `ToolCallInterceptor`          | Application | Orchestrates call parsing and a domain permission decision, then invokes `ToolSimulationPort`; concrete simulators remain Infrastructure |
+| `TraceEvaluator`               | Application | Applies deterministic oracles first and structured semantic evaluation only where needed                                                 |
+| `FindingCorrelator`            | Domain      | Groups repeated symptoms and creates stable evidence-backed findings                                                                     |
+| `ScoreCalculator`              | Domain      | Produces versioned deterministic scores, coverage, and readiness                                                                         |
+| `GuardrailApplicabilityPolicy` | Domain      | Validates typed changes, conflicts, source fingerprints, and candidate invariants                                                        |
+| `GuardrailDesigner`            | Application | Orchestrates optional advice and submits parsed proposals to the domain applicability policy                                             |
+| `AuditComparator`              | Domain      | Matches stable tests/findings and calculates paired deltas and utility changes                                                           |
 
 ### 6.2 Pipeline
 
@@ -297,17 +302,17 @@ See [Database Design](DATABASE_DESIGN.md) for the conceptual schema and transact
 
 ### 10.1 Information architecture
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Product overview, recent agents/audits, one-click bundled Demo entry |
-| `/agents/new` | Guided agent definition creation |
-| `/agents/:agentId` | Profile, immutable revision history, and related audits |
-| `/agents/:agentId/revisions/new` | Create a draft derived from an existing revision |
-| `/audits/new?revision=:id` | Capability review, mode, budgets, consent, and start |
-| `/audits/:runId` | Persistent progress or completed report overview |
-| `/audits/:runId/findings/:findingId` | Deep-linked finding, trace, evidence, and guardrails |
-| `/audits/:runId/guardrails` | Review proposals and create a candidate revision |
-| `/comparisons/:comparisonId` | Baseline versus verification results and utility changes |
+| Route                                | Purpose                                                              |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| `/`                                  | Product overview, recent agents/audits, one-click bundled Demo entry |
+| `/agents/new`                        | Guided agent definition creation                                     |
+| `/agents/:agentId`                   | Profile, immutable revision history, and related audits              |
+| `/agents/:agentId/revisions/new`     | Create a draft derived from an existing revision                     |
+| `/audits/new?revision=:id`           | Capability review, mode, budgets, consent, and start                 |
+| `/audits/:runId`                     | Persistent progress or completed report overview                     |
+| `/audits/:runId/findings/:findingId` | Deep-linked finding, trace, evidence, and guardrails                 |
+| `/audits/:runId/guardrails`          | Review proposals and create a candidate revision                     |
+| `/comparisons/:comparisonId`         | Baseline versus verification results and utility changes             |
 
 There are no account, billing, administration, or cloud settings shells.
 
@@ -335,7 +340,11 @@ Charts always have table or text equivalents. Severity and change use text, shap
 
 ### 10.4 Progress and errors
 
-`POST /api/v1/audits` returns an accepted run with an ID. The run page polls `GET /api/v1/audits/:id` using increasing intervals while active and immediately refreshes after cancel/retry commands. Persisted progress makes refresh and navigation safe. Server-sent events are a future optimization, not an MVP dependency.
+`POST /api/v1/audits` returns an accepted run with an ID. In the current
+foundation, the server-rendered run page reads that persisted state on each
+navigation and refreshes after cancellation. M3 adds increasing-interval polling
+while work is active. Persisted progress—not an in-memory event—remains the
+source of truth; server-sent events are only a future optimization.
 
 Stable error codes distinguish validation, configuration, model unavailable, rate limited, timeout, invalid structured output, conflict, interruption, not found, and unexpected failure. Messages are safe, actionable, and never contain prompts, keys, raw provider payloads, or stack traces.
 
@@ -436,7 +445,12 @@ No hosted telemetry is sent. Performance timing is local and used for the stated
 
 ## 15. Local deployment and evolution
 
-The MVP deployment is a browser connected to a loopback Node.js server and a local SQLite file. Startup validates configuration, applies approved migrations through the documented local workflow, reconciles interrupted work, and then accepts requests. There is no Docker image, cloud deployment, or Kubernetes design.
+The MVP deployment is a browser connected to a loopback Node.js server and a
+local SQLite file. The current startup validates configuration and uses the
+documented migration workflow before serving requests. The interruption
+reconciliation use case is implemented and explicitly invocable; automatic
+startup invocation arrives with the M3 worker lifecycle. There is no Docker
+image, cloud deployment, or Kubernetes design.
 
 The architecture deliberately leaves these seams:
 

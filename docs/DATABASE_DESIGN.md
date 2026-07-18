@@ -4,7 +4,13 @@
 
 Agent Auditor will use Prisma with SQLite as the local system of record. The schema must support immutable audit provenance, stage-level recovery, evidence traversal, paired comparisons, and future migration without introducing user, tenant, authentication, billing, or cloud-infrastructure concepts.
 
-This is a **conceptual design**, not a Prisma schema. No Prisma files, migrations, generated client, or database are created during the planning phase.
+This document remains the conceptual source of truth for the target data model.
+The current M1/M2 foundation realizes most of it as a Prisma schema, committed
+initial migration, explicit mappers, and repository foundations. Tables for
+later audit artifacts exist for forward-compatible persistence design, but the
+M3-M5 engine and remediation repositories are not implied to be operational.
+`ProviderInvocation` is an M6-reserved target table and is deliberately absent
+from the current Prisma schema and migration until provider execution exists.
 
 ### 1.1 Design principles
 
@@ -20,16 +26,16 @@ This is a **conceptual design**, not a Prisma schema. No Prisma files, migration
 
 ## 2. SQLite representation conventions
 
-| Concept | Planned representation | Rationale |
-| --- | --- | --- |
-| IDs | Application-generated UUID strings in `TEXT` columns | Stable across layers and portable to another relational database |
-| Timestamps | Prisma `DateTime`, normalized to UTC | Consistent ordering and display conversion at the presentation edge |
-| Enum-like states | Validated strings with migration-level `CHECK` constraints where practical | Avoid reliance on a database-native enum and keep values readable |
-| Scores and confidence arithmetic | Integer basis points or integer weights | Deterministic math; no floating-point drift |
-| Boolean | Prisma Boolean / SQLite integer representation | Standard ORM mapping |
-| Canonical structured data | `TEXT` containing canonical JSON plus a schema-version column | Explicit portability, digests, and mandatory Zod parsing |
-| Content fingerprints | Lowercase SHA-256 digest string | Stable identity/deduplication inside the app; not claimed as tamper-proof storage |
-| Optimistic concurrency | Integer `recordVersion` on mutable roots | Prevent lost updates without long transactions |
+| Concept                          | Planned representation                                                     | Rationale                                                                         |
+| -------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| IDs                              | Application-generated UUID strings in `TEXT` columns                       | Stable across layers and portable to another relational database                  |
+| Timestamps                       | Prisma `DateTime`, normalized to UTC                                       | Consistent ordering and display conversion at the presentation edge               |
+| Enum-like states                 | Validated strings with migration-level `CHECK` constraints where practical | Avoid reliance on a database-native enum and keep values readable                 |
+| Scores and confidence arithmetic | Integer basis points or integer weights                                    | Deterministic math; no floating-point drift                                       |
+| Boolean                          | Prisma Boolean / SQLite integer representation                             | Standard ORM mapping                                                              |
+| Canonical structured data        | `TEXT` containing canonical JSON plus a schema-version column              | Explicit portability, digests, and mandatory Zod parsing                          |
+| Content fingerprints             | Lowercase SHA-256 digest string                                            | Stable identity/deduplication inside the app; not claimed as tamper-proof storage |
+| Optimistic concurrency           | Integer `recordVersion` on mutable roots                                   | Prevent lost updates without long transactions                                    |
 
 Exact Prisma support for SQLite JSON and generated checks will be verified when versions are pinned. The domain does not depend on native JSON operators or native enums.
 
@@ -75,6 +81,9 @@ Self-references not shown for readability:
 - `AuditRun.retryOfRunId` records a new attempt after a terminal failure.
 - `FindingMatch` optionally references a baseline finding and a verification finding.
 
+`PROVIDER_INVOCATION` appears in this target-model diagram for M6 planning. It
+is not part of the current M1/M2 physical schema.
+
 ## 4. Table specifications
 
 Fields marked “JSON” are canonical JSON text validated against the named application schema.
@@ -83,15 +92,15 @@ Fields marked “JSON” are canonical JSON text validated against the named app
 
 Stable user-facing agent identity.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `name` | TEXT | Required, trimmed, bounded |
-| `description` | TEXT | Required with empty string allowed; bounded |
-| `recordVersion` | INTEGER | Required, starts at 1, optimistic concurrency |
-| `createdAt` | DateTime | Required UTC |
-| `updatedAt` | DateTime | Required UTC |
-| `archivedAt` | DateTime nullable | Archive is reversible and distinct from privacy purge |
+| Field           | Type              | Constraints / notes                                   |
+| --------------- | ----------------- | ----------------------------------------------------- |
+| `id`            | TEXT              | Primary key                                           |
+| `name`          | TEXT              | Required, trimmed, bounded                            |
+| `description`   | TEXT              | Required with empty string allowed; bounded           |
+| `recordVersion` | INTEGER           | Required, starts at 1, optimistic concurrency         |
+| `createdAt`     | DateTime          | Required UTC                                          |
+| `updatedAt`     | DateTime          | Required UTC                                          |
+| `archivedAt`    | DateTime nullable | Archive is reversible and distinct from privacy purge |
 
 Indexes: `(archivedAt, updatedAt DESC)` for dashboard recency and normalized name for local search. The latest revision is queried by `(agentProfileId, revisionNumber DESC)`; no circular current-revision pointer is stored.
 
@@ -99,23 +108,23 @@ Indexes: `(archivedAt, updatedAt DESC)` for dashboard recency and normalized nam
 
 Immutable definition snapshot.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `agentProfileId` | TEXT | Required FK to `AgentProfile` |
-| `revisionNumber` | INTEGER | Positive, monotonically assigned per profile |
-| `sourceRevisionId` | TEXT nullable | Self-FK, same profile, restrict deletion outside profile purge |
-| `systemPrompt` | TEXT | Required, maximum 64,000 characters |
-| `safeBehaviorNotes` | TEXT | Required with empty string allowed; bounded |
-| `operationalControlsSchemaVersion` | TEXT | Version of the declarative control contract |
-| `operationalControlsJson` | JSON | Bounded stop/retry/escalation/confirmation/evidence requirements; no executable expressions |
-| `definitionSchemaVersion` | TEXT | Parser/canonicalization contract |
-| `fingerprint` | TEXT | SHA-256 of canonical definition |
-| `contentScanVersion` | TEXT | Version of the credential-pattern check used at creation |
-| `contentScanStatus` | TEXT | `CLEAR` or `WARNING_ACKNOWLEDGED`; blocked matches are never inserted |
-| `secretWarningAcknowledgedAt` | DateTime nullable | Required only for acknowledged warning; no matched secret text is duplicated here |
-| `creationSource` | TEXT | `USER`, `GUARDRAIL`, or `SYNTHETIC_SEED` |
-| `createdAt` | DateTime | Required UTC; no `updatedAt` because immutable |
+| Field                              | Type              | Constraints / notes                                                                         |
+| ---------------------------------- | ----------------- | ------------------------------------------------------------------------------------------- |
+| `id`                               | TEXT              | Primary key                                                                                 |
+| `agentProfileId`                   | TEXT              | Required FK to `AgentProfile`                                                               |
+| `revisionNumber`                   | INTEGER           | Positive, monotonically assigned per profile                                                |
+| `sourceRevisionId`                 | TEXT nullable     | Self-FK, same profile, restrict deletion outside profile purge                              |
+| `systemPrompt`                     | TEXT              | Required, maximum 64,000 characters                                                         |
+| `safeBehaviorNotes`                | TEXT              | Required with empty string allowed; bounded                                                 |
+| `operationalControlsSchemaVersion` | TEXT              | Version of the declarative control contract                                                 |
+| `operationalControlsJson`          | JSON              | Bounded stop/retry/escalation/confirmation/evidence requirements; no executable expressions |
+| `definitionSchemaVersion`          | TEXT              | Parser/canonicalization contract                                                            |
+| `fingerprint`                      | TEXT              | SHA-256 of canonical definition                                                             |
+| `contentScanVersion`               | TEXT              | Version of the credential-pattern check used at creation                                    |
+| `contentScanStatus`                | TEXT              | `CLEAR` or `WARNING_ACKNOWLEDGED`; blocked matches are never inserted                       |
+| `secretWarningAcknowledgedAt`      | DateTime nullable | Required only for acknowledged warning; no matched secret text is duplicated here           |
+| `creationSource`                   | TEXT              | `USER`, `GUARDRAIL`, or `SYNTHETIC_SEED`                                                    |
+| `createdAt`                        | DateTime          | Required UTC; no `updatedAt` because immutable                                              |
 
 Unique: `(agentProfileId, revisionNumber)` and `(id, agentProfileId)` for the composite lineage FK. `sourceRevisionId`, when present, references `(id, agentProfileId)` so a lineage cannot cross profiles. Indexes: `(agentProfileId, revisionNumber DESC)`, `(agentProfileId, createdAt DESC)`, and non-unique `(agentProfileId, fingerprint)`.
 
@@ -127,18 +136,18 @@ The prompt is stored once per revision. A run also stores the revision fingerpri
 
 Normalized child of an agent revision.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `agentRevisionId` | TEXT | Required FK |
-| `name` | TEXT | Canonical tool identifier |
-| `description` | TEXT | Bounded untrusted text |
-| `schemaVersion` | TEXT | Supported declarative-schema contract |
-| `inputSchemaJson` | JSON | Maximum 64 KiB; depth and keyword limits |
-| `simulatorId` | TEXT | Must resolve to the closed application catalog |
-| `simulatorConfigJson` | JSON | Declarative fixture selection only; no paths, URLs, code, or credentials |
-| `ordinal` | INTEGER | Stable display/canonicalization order |
-| `fingerprint` | TEXT | Canonical tool digest |
+| Field                 | Type    | Constraints / notes                                                      |
+| --------------------- | ------- | ------------------------------------------------------------------------ |
+| `id`                  | TEXT    | Primary key                                                              |
+| `agentRevisionId`     | TEXT    | Required FK                                                              |
+| `name`                | TEXT    | Canonical tool identifier                                                |
+| `description`         | TEXT    | Bounded untrusted text                                                   |
+| `schemaVersion`       | TEXT    | Supported declarative-schema contract                                    |
+| `inputSchemaJson`     | JSON    | Maximum 64 KiB; depth and keyword limits                                 |
+| `simulatorId`         | TEXT    | Must resolve to the closed application catalog                           |
+| `simulatorConfigJson` | JSON    | Declarative fixture selection only; no paths, URLs, code, or credentials |
+| `ordinal`             | INTEGER | Stable display/canonicalization order                                    |
+| `fingerprint`         | TEXT    | Canonical tool digest                                                    |
 
 Unique: `(agentRevisionId, name)`, `(agentRevisionId, ordinal)`, `(agentRevisionId, fingerprint)`, and `(id, agentRevisionId)` for composite ownership references. Index on `simulatorId` is optional for diagnostics, not runtime dispatch.
 
@@ -146,20 +155,20 @@ Unique: `(agentRevisionId, name)`, `(agentRevisionId, ordinal)`, `(agentRevision
 
 Declarative allow/deny scope owned by an agent revision.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `agentRevisionId` | TEXT | Required FK |
-| `toolDefinitionId` | TEXT nullable | Optional FK; when present it must belong to the same revision |
-| `effect` | TEXT | `ALLOW` or `DENY`; ambiguity resolves to deny |
-| `capabilityKey` | TEXT | Stable action identifier |
-| `resourceType` | TEXT | Synthetic resource class, never a real endpoint |
-| `scopeSchemaVersion` | TEXT | Contract version |
-| `scopeJson` | JSON | Declarative synthetic scope |
-| `conditionsJson` | JSON | Declarative conditions; no expression language |
-| `requiresConfirmation` | Boolean | Required |
-| `ordinal` | INTEGER | Stable order |
-| `fingerprint` | TEXT | Canonical grant digest |
+| Field                  | Type          | Constraints / notes                                           |
+| ---------------------- | ------------- | ------------------------------------------------------------- |
+| `id`                   | TEXT          | Primary key                                                   |
+| `agentRevisionId`      | TEXT          | Required FK                                                   |
+| `toolDefinitionId`     | TEXT nullable | Optional FK; when present it must belong to the same revision |
+| `effect`               | TEXT          | `ALLOW` or `DENY`; ambiguity resolves to deny                 |
+| `capabilityKey`        | TEXT          | Stable action identifier                                      |
+| `resourceType`         | TEXT          | Synthetic resource class, never a real endpoint               |
+| `scopeSchemaVersion`   | TEXT          | Contract version                                              |
+| `scopeJson`            | JSON          | Declarative synthetic scope                                   |
+| `conditionsJson`       | JSON          | Declarative conditions; no expression language                |
+| `requiresConfirmation` | Boolean       | Required                                                      |
+| `ordinal`              | INTEGER       | Stable order                                                  |
+| `fingerprint`          | TEXT          | Canonical grant digest                                        |
 
 Unique: `(agentRevisionId, ordinal)` and `(agentRevisionId, fingerprint)`. Index: `(agentRevisionId, capabilityKey)`. A composite ownership relation or repository check will guarantee that `toolDefinitionId` and `agentRevisionId` agree.
 
@@ -167,24 +176,28 @@ Unique: `(agentRevisionId, ordinal)` and `(agentRevisionId, fingerprint)`. Index
 
 Versioned and immutable after locking.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `agentRevisionId` | TEXT | Revision used to derive the plan |
-| `targetFingerprint` | TEXT | Must match the source revision at creation |
-| `kind` | TEXT | `PRIMARY` or `SUPPLEMENTAL`; included in fingerprint |
-| `status` | TEXT | `BUILDING`, `LOCKED`, or `ABANDONED` |
-| `seed` | TEXT | Canonical seed representation |
-| `engineVersion` | TEXT | Audit engine version |
-| `taxonomyVersion` | TEXT | Risk taxonomy version |
-| `templateVersion` | TEXT | Deterministic case catalog version |
-| `budgetSchemaVersion` | TEXT | Budget contract |
-| `budgetJson` | JSON | Case/step/tool/time/output limits |
-| `coverageLimitationsJson` | JSON | Explicit uncovered facts/capabilities |
-| `fingerprint` | TEXT nullable until lock | Covers ordered locked definition |
-| `createdAt` | DateTime | Required UTC |
-| `lockedAt` | DateTime nullable | Required only when locked |
-| `abandonedAt` | DateTime nullable | Required only when abandoned |
+| Field                     | Type                     | Constraints / notes                                         |
+| ------------------------- | ------------------------ | ----------------------------------------------------------- |
+| `id`                      | TEXT                     | Primary key                                                 |
+| `agentRevisionId`         | TEXT                     | Revision used to derive the plan                            |
+| `targetFingerprint`       | TEXT                     | Must match the source revision at creation                  |
+| `kind`                    | TEXT                     | `PRIMARY` or `SUPPLEMENTAL`; included in fingerprint        |
+| `status`                  | TEXT                     | `BUILDING`, `LOCKED`, or `ABANDONED`                        |
+| `seed`                    | TEXT                     | Canonical seed representation                               |
+| `engineVersion`           | TEXT                     | Audit engine version                                        |
+| `taxonomyVersion`         | TEXT                     | Risk taxonomy version                                       |
+| `templateVersion`         | TEXT                     | Deterministic case catalog version                          |
+| `evaluationPolicyVersion` | TEXT                     | Evidence-evaluation policy included in the plan fingerprint |
+| `scoringPolicyVersion`    | TEXT                     | Score policy required for comparable locked plans           |
+| `fixtureVersion`          | TEXT                     | Synthetic fixture contract required for replay              |
+| `budgetSchemaVersion`     | TEXT                     | Budget contract                                             |
+| `budgetJson`              | JSON                     | Case/step/tool/time/output limits                           |
+| `coverageSchemaVersion`   | TEXT                     | Typed coverage-limitation projection contract               |
+| `coverageLimitationsJson` | JSON                     | Explicit uncovered facts/capabilities                       |
+| `fingerprint`             | TEXT nullable until lock | Covers ordered locked definition                            |
+| `createdAt`               | DateTime                 | Required UTC                                                |
+| `lockedAt`                | DateTime nullable        | Required only when locked                                   |
+| `abandonedAt`             | DateTime nullable        | Required only when abandoned                                |
 
 Unique locked plan fingerprint can be enforced per revision: `(agentRevisionId, fingerprint)`. Index: `(agentRevisionId, createdAt DESC)`, `(kind, status, createdAt)`, and `(status, createdAt)`. A `PRIMARY` plan defines the baseline/verification population. A `SUPPLEMENTAL` plan is derived for the candidate revision, is executed by a distinct run, and is never substituted into a primary paired delta. Typed coverage-limit entries carry capability key, impact, stable reason code, and bounded explanation; they are included in the plan fingerprint.
 
@@ -192,19 +205,19 @@ Unique locked plan fingerprint can be enforced per revision: `(agentRevisionId, 
 
 Persisted plan provenance.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `auditPlanId` | TEXT | Required FK |
-| `riskCategory` | TEXT | Versioned original taxonomy key |
-| `primaryDimension` | TEXT | One of the security dimension keys |
-| `potentialSeverity` | TEXT | Normalized severity |
-| `priority` | INTEGER | Deterministic order within budget |
-| `title` | TEXT | Safe bounded summary |
-| `rationale` | TEXT | Evidence-free planning rationale, not hidden reasoning |
-| `source` | TEXT | `DETERMINISTIC` or `ADAPTIVE` |
-| `capabilityKeysJson` | JSON | Sorted stable capability keys |
-| `ordinal` | INTEGER | Stable order |
+| Field                | Type    | Constraints / notes                                    |
+| -------------------- | ------- | ------------------------------------------------------ |
+| `id`                 | TEXT    | Primary key                                            |
+| `auditPlanId`        | TEXT    | Required FK                                            |
+| `riskCategory`       | TEXT    | Versioned original taxonomy key                        |
+| `primaryDimension`   | TEXT    | One of the security dimension keys                     |
+| `potentialSeverity`  | TEXT    | Normalized severity                                    |
+| `priority`           | INTEGER | Deterministic order within budget                      |
+| `title`              | TEXT    | Safe bounded summary                                   |
+| `rationale`          | TEXT    | Evidence-free planning rationale, not hidden reasoning |
+| `source`             | TEXT    | `DETERMINISTIC` or `ADAPTIVE`                          |
+| `capabilityKeysJson` | JSON    | Sorted stable capability keys                          |
+| `ordinal`            | INTEGER | Stable order                                           |
 
 Unique: `(auditPlanId, ordinal)`. Index: `(auditPlanId, primaryDimension)`.
 
@@ -212,98 +225,113 @@ Unique: `(auditPlanId, ordinal)`. Index: `(auditPlanId, primaryDimension)`.
 
 Immutable case definition owned by a plan.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `auditPlanId` | TEXT | Required FK |
-| `riskHypothesisId` | TEXT nullable | Optional FK within the same plan; mandatory cases may have none |
-| `stableKey` | TEXT | Namespaced semantic key |
-| `definitionFingerprint` | TEXT | Canonical case digest |
-| `source` | TEXT | `MANDATORY`, `CAPABILITY`, `INTERACTION`, `ADAPTIVE`, or `SUPPLEMENTAL`; verification provenance belongs to the run, so replay does not mutate this value |
-| `primaryDimension` | TEXT | Five security dimensions or utility |
-| `riskCategory` | TEXT | Taxonomy key |
-| `severity` | TEXT | Low/Medium/High/Critical |
-| `severityWeight` | INTEGER | 1, 3, 7, or 12; persisted calculation input |
-| `isUtility` | Boolean | Required |
-| `title` | TEXT | Human-readable |
-| `objective` | TEXT | What behavior is being established |
-| `setupSchemaVersion` | TEXT | Synthetic setup contract |
-| `setupJson` | JSON | Fixture and synthetic-world setup |
-| `stimulusJson` | JSON | Ordered target inputs, bounded |
-| `oracleSchemaVersion` | TEXT | Oracle contract |
-| `oracleJson` | JSON | Deterministic/semantic expectations |
-| `fixtureVersion` | TEXT | Simulation catalog version |
-| `budgetJson` | JSON | Case-specific bounds within plan caps |
-| `ordinal` | INTEGER | Stable plan order |
+| Field                                                                   | Type                   | Constraints / notes                                                                                                                                       |
+| ----------------------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                                                    | TEXT                   | Primary key                                                                                                                                               |
+| `auditPlanId`                                                           | TEXT                   | Required FK                                                                                                                                               |
+| `riskHypothesisId`                                                      | TEXT nullable          | Optional FK within the same plan; mandatory cases may have none                                                                                           |
+| `stableKey`                                                             | TEXT                   | Namespaced semantic key                                                                                                                                   |
+| `definitionFingerprint`                                                 | TEXT                   | Canonical case digest                                                                                                                                     |
+| `source`                                                                | TEXT                   | `MANDATORY`, `CAPABILITY`, `INTERACTION`, `ADAPTIVE`, or `SUPPLEMENTAL`; verification provenance belongs to the run, so replay does not mutate this value |
+| `primaryDimension`                                                      | TEXT                   | Five security dimensions or utility                                                                                                                       |
+| `riskCategory`                                                          | TEXT                   | Taxonomy key                                                                                                                                              |
+| `severity`                                                              | TEXT                   | Low/Medium/High/Critical                                                                                                                                  |
+| `severityWeight`                                                        | INTEGER                | 1, 3, 7, or 12; persisted calculation input                                                                                                               |
+| `isUtility`                                                             | Boolean                | Derived persistence projection of the domain classification; must agree with `primaryDimension`                                                           |
+| `title`                                                                 | TEXT                   | Human-readable                                                                                                                                            |
+| `rationale`                                                             | TEXT                   | Evidence-free case rationale, not hidden reasoning                                                                                                        |
+| `applicableCapabilitySchemaVersion`                                     | TEXT                   | Capability-key projection contract                                                                                                                        |
+| `applicableCapabilityKeysJson`                                          | JSON                   | Sorted stable capability keys                                                                                                                             |
+| `maxInteractionSteps`                                                   | INTEGER                | Domain-enforced value from 1 through 50                                                                                                                   |
+| `oracleSchemaVersion`                                                   | TEXT                   | Oracle contract                                                                                                                                           |
+| `oracleJson`                                                            | JSON                   | Deterministic/semantic expectations                                                                                                                       |
+| `version`                                                               | TEXT                   | Immutable case-definition version                                                                                                                         |
+| `ordinal`                                                               | INTEGER                | Stable plan order                                                                                                                                         |
+| `objective`, setup/stimulus fields, `fixtureVersion`, and budget fields | Nullable M3 projection | Reserved as an all-or-none group for the richer executable-case planner contract; not populated by the current domain model                               |
 
 Unique: `(auditPlanId, stableKey)`, `(auditPlanId, ordinal)`, and `(id, auditPlanId)` for composite ownership references. Index: `(auditPlanId, primaryDimension, severity)`.
+
+The required fields above are a lossless persistence projection of the current
+`AuditTestCase` domain value. `isUtility` is derived from `classification`, and
+`severityWeight` is derived from the versioned severity mapping. Milestone
+three must introduce and validate the reserved executable-case fields in the
+domain before repositories may populate them.
 
 ### 4.8 `AuditRun`
 
 Lifecycle and provenance for one execution attempt.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `agentRevisionId` | TEXT | Target revision FK |
-| `agentRevisionFingerprint` | TEXT | Immutable compatibility check |
-| `runPurpose` | TEXT | `BASELINE`, `VERIFICATION`, or `SUPPLEMENTAL`; fixed by the idempotent request |
-| `auditPlanId` | TEXT nullable while queued/planning | Plan FK; required and fixed before execution |
-| `auditPlanFingerprint` | TEXT nullable until lock | Immutable compatibility check once the plan is locked |
-| `baselineRunId` | TEXT nullable | Completed baseline for a verification run |
-| `retryOfRunId` | TEXT nullable | Prior terminal attempt |
-| `idempotencyKey` | TEXT | Unique command key |
-| `mode` | TEXT | `DEMO` or `LIVE` |
-| `modelReference` | TEXT nullable | Required for Live and restricted by configuration to a validated GPT-5.6 identifier/snapshot; absent for Demo |
-| `modelRequestProfileSchemaVersion` | TEXT nullable | Versioned per-role non-secret request settings; required for Live |
-| `modelRequestProfileJson` | JSON nullable | Canonical purpose-keyed planner/target/evaluator/guardrail settings; required for Live |
-| `modelRequestProfileDigest` | TEXT nullable | Comparison and consent identity for the canonical profile |
-| `liveConsentVersion` | TEXT nullable | Required for Live, null for Demo |
-| `liveConsentAt` | DateTime nullable | One-run confirmation timestamp; required for Live |
-| `transmissionSummaryDigest` | TEXT nullable | Digest bound to revision, exact model, request profile, and disclosed content classes; required for Live |
-| `status` | TEXT | Domain state machine value |
-| `engineVersion` | TEXT | Copied provenance |
-| `taxonomyVersion` | TEXT | Copied provenance |
-| `evaluationPolicyVersion` | TEXT | Trace-to-outcome/finding/severity policy provenance |
-| `scoringPolicyVersion` | TEXT | Copied provenance |
-| `fixtureVersion` | TEXT | Copied provenance |
-| `seed` | TEXT | Effective run seed |
-| `budgetJson` | JSON | Effective bounded budget |
-| `plannedCaseCount` | INTEGER | Non-negative |
-| `completedCaseCount` | INTEGER | Between 0 and planned count |
-| `currentPhase` | TEXT | Safe phase value |
-| `attemptNumber` | INTEGER | Starts at 1; increments only for interrupted recovery |
-| `recordVersion` | INTEGER | Starts at 1; optimistic compare-and-swap for lifecycle/progress updates |
-| `cancellationRequestedAt` | DateTime nullable | Durable cancellation signal |
-| `failureCode` | TEXT nullable | Stable safe error code |
-| `failureSummary` | TEXT nullable | Redacted user-facing detail |
-| `createdAt` | DateTime | Required UTC |
-| `startedAt` | DateTime nullable | Lifecycle timestamp |
-| `completedAt` | DateTime nullable | Terminal timestamp |
-| `updatedAt` | DateTime | Progress ordering |
+| Field                              | Type                                | Constraints / notes                                                                                           |
+| ---------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `id`                               | TEXT                                | Primary key                                                                                                   |
+| `agentRevisionId`                  | TEXT                                | Target revision FK                                                                                            |
+| `agentRevisionFingerprint`         | TEXT                                | Immutable compatibility check                                                                                 |
+| `runPurpose`                       | TEXT                                | `BASELINE`, `VERIFICATION`, or `SUPPLEMENTAL`; fixed by the idempotent request                                |
+| `auditPlanId`                      | TEXT nullable while queued/planning | Plan FK; required and fixed before execution                                                                  |
+| `auditPlanFingerprint`             | TEXT nullable until lock            | Immutable compatibility check once the plan is locked                                                         |
+| `baselineRunId`                    | TEXT nullable                       | Completed baseline for a verification run                                                                     |
+| `retryOfRunId`                     | TEXT nullable                       | Prior terminal attempt                                                                                        |
+| `idempotencyKey`                   | TEXT                                | Unique command key                                                                                            |
+| `mode`                             | TEXT                                | `DEMO` or `LIVE`                                                                                              |
+| `modelReference`                   | TEXT nullable                       | Required for Live and restricted by configuration to a validated GPT-5.6 identifier/snapshot; absent for Demo |
+| `modelRequestProfileSchemaVersion` | TEXT nullable                       | Versioned per-role non-secret request settings; required for Live                                             |
+| `modelRequestProfileJson`          | JSON nullable                       | Canonical purpose-keyed planner/target/evaluator/guardrail settings; required for Live                        |
+| `modelRequestProfileDigest`        | TEXT nullable                       | Comparison and consent identity for the canonical profile                                                     |
+| `liveConsentVersion`               | TEXT nullable                       | Required for Live, null for Demo                                                                              |
+| `liveConsentAt`                    | DateTime nullable                   | One-run confirmation timestamp; required for Live                                                             |
+| `transmissionSummaryDigest`        | TEXT nullable                       | Digest bound to revision, exact model, request profile, and disclosed content classes; required for Live      |
+| `status`                           | TEXT                                | Domain state machine value                                                                                    |
+| `engineVersion`                    | TEXT                                | Copied provenance                                                                                             |
+| `taxonomyVersion`                  | TEXT                                | Copied provenance                                                                                             |
+| `evaluationPolicyVersion`          | TEXT                                | Trace-to-outcome/finding/severity policy provenance                                                           |
+| `scoringPolicyVersion`             | TEXT                                | Copied provenance                                                                                             |
+| `fixtureVersion`                   | TEXT                                | Copied provenance                                                                                             |
+| `seed`                             | TEXT                                | Effective run seed                                                                                            |
+| `budgetJson`                       | JSON                                | Effective bounded budget                                                                                      |
+| `plannedCaseCount`                 | INTEGER                             | Non-negative                                                                                                  |
+| `completedCaseCount`               | INTEGER                             | Between 0 and planned count                                                                                   |
+| `currentPhase`                     | TEXT                                | Safe phase value                                                                                              |
+| `attemptNumber`                    | INTEGER                             | Starts at 1; increments only for interrupted recovery                                                         |
+| `recordVersion`                    | INTEGER                             | Starts at 1; optimistic compare-and-swap for lifecycle/progress updates                                       |
+| `cancellationRequestedAt`          | DateTime nullable                   | Durable cancellation signal                                                                                   |
+| `failureCode`                      | TEXT nullable                       | Stable safe error code                                                                                        |
+| `failureSummary`                   | TEXT nullable                       | Redacted user-facing detail                                                                                   |
+| `createdAt`                        | DateTime                            | Required UTC                                                                                                  |
+| `startedAt`                        | DateTime nullable                   | Lifecycle timestamp                                                                                           |
+| `completedAt`                      | DateTime nullable                   | Terminal timestamp                                                                                            |
+| `updatedAt`                        | DateTime                            | Progress ordering                                                                                             |
 
 Unique: `idempotencyKey` and `(id, auditPlanId)` when a plan is attached, for composite ownership references. Indexes: `(status, updatedAt)`, `(agentRevisionId, createdAt DESC)`, `(auditPlanId, createdAt)`, `baselineRunId`, and `retryOfRunId`.
 
-Database checks require the three request-profile fields and all three consent fields for Live and require them to be null for Demo. They also require `baselineRunId` only for `VERIFICATION`, a `PRIMARY` plan for `BASELINE`/`VERIFICATION`, and a `SUPPLEMENTAL` plan for `SUPPLEMENTAL` once attached. The disclosed content classes include optional, user-invoked post-audit guardrail advice for this run. The application recomputes the profile and transmission-summary digests before execution, so consent cannot be reused after a revision, model, or request-setting change.
+Database checks require the three request-profile fields and all three consent
+fields for Live and require them to be null for Demo. They also require
+`baselineRunId` only for `VERIFICATION`. SQLite cannot express a cross-row
+plan-kind check with a normal `CHECK`: the domain attach policy and future M3
+repository transaction therefore require a locked `PRIMARY` plan for
+`BASELINE`/`VERIFICATION` and a locked `SUPPLEMENTAL` plan for `SUPPLEMENTAL`
+before persisting the attachment. The disclosed content classes include
+optional, user-invoked post-audit guardrail advice for this run. The application
+recomputes the profile and transmission-summary digests before execution, so
+consent cannot be reused after a revision, model, or request-setting change.
 
 ### 4.9 `AuditJob`
 
 One-to-one local coordinator record. It is not an external queue abstraction.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `auditRunId` | TEXT | Required unique FK |
-| `status` | TEXT | `QUEUED`, `LEASED`, `WAITING_RETRY`, or `TERMINAL` |
-| `stage` | TEXT | Current resumable stage |
-| `leaseOwner` | TEXT nullable | Ephemeral process identifier, not a credential |
-| `leaseExpiresAt` | DateTime nullable | Recovery boundary |
-| `nextAttemptAt` | DateTime nullable | Bounded retry scheduling |
-| `attemptCount` | INTEGER | Non-negative |
-| `recordVersion` | INTEGER | Starts at 1; optimistic compare-and-swap for lease/status updates |
-| `lastErrorCode` | TEXT nullable | Safe code only |
-| `createdAt` | DateTime | Required UTC |
-| `updatedAt` | DateTime | Required UTC |
+| Field            | Type              | Constraints / notes                                               |
+| ---------------- | ----------------- | ----------------------------------------------------------------- |
+| `id`             | TEXT              | Primary key                                                       |
+| `auditRunId`     | TEXT              | Required unique FK                                                |
+| `status`         | TEXT              | `QUEUED`, `LEASED`, `WAITING_RETRY`, or `TERMINAL`                |
+| `stage`          | TEXT              | Current resumable stage                                           |
+| `leaseOwner`     | TEXT nullable     | Ephemeral process identifier, not a credential                    |
+| `leaseExpiresAt` | DateTime nullable | Recovery boundary                                                 |
+| `nextAttemptAt`  | DateTime nullable | Bounded retry scheduling                                          |
+| `attemptCount`   | INTEGER           | Non-negative                                                      |
+| `recordVersion`  | INTEGER           | Starts at 1; optimistic compare-and-swap for lease/status updates |
+| `lastErrorCode`  | TEXT nullable     | Safe code only                                                    |
+| `createdAt`      | DateTime          | Required UTC                                                      |
+| `updatedAt`      | DateTime          | Required UTC                                                      |
 
 Indexes: `(status, nextAttemptAt, createdAt)` and `leaseExpiresAt`. Leasing uses an atomic conditional update over ID, `recordVersion`, expected status, and lease expiry; one local worker is the default. `WAITING_RETRY` is valid only with an `INTERRUPTED` run that remains eligible under the bounded recovery policy, `LEASED` only with an active run phase, and `TERMINAL` only with a terminal run. Eligible recovery atomically moves the pair to `QUEUED`/Queued and increments run-attempt metadata; ineligible recovery atomically terminates both records as Failed/Cancelled. A later lease acquisition and Queued-to-Planning transition happen together. Job/run transitions share one transaction.
 
@@ -311,93 +339,121 @@ Indexes: `(status, nextAttemptAt, createdAt)` and `leaseExpiresAt`. Leasing uses
 
 One case attempt within a run.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `auditRunId` | TEXT | Required FK |
-| `auditPlanId` | TEXT | Required; duplicates locked ownership for composite FK enforcement |
-| `auditTestCaseId` | TEXT | Required FK; case must belong to the run plan |
-| `attemptNumber` | INTEGER | Positive |
-| `status` | TEXT | Pending/running/completed/errored/interrupted/skipped/cancelled |
-| `outcome` | TEXT nullable | Pass/warning/fail/inconclusive only when completed |
-| `skipReasonCode` | TEXT nullable | Required only for skipped: `NON_APPLICABLE`, `BUDGET_EXHAUSTED`, or `DEPENDENCY_UNAVAILABLE` |
-| `isEffective` | Boolean | Exactly one terminal attempt per run/case is selected for finalization |
-| `supersededByExecutionId` | TEXT nullable | Self-FK to a later attempt; prior traces remain immutable |
-| `seed` | TEXT | Case seed |
-| `stepCount` | INTEGER | Non-negative and budget-bounded |
-| `toolAttemptCount` | INTEGER | Non-negative and budget-bounded |
-| `usageJson` | JSON | Normalized counts only, no pricing or raw provider object |
-| `terminalReason` | TEXT nullable | Bounded safe summary |
-| `errorCode` | TEXT nullable | Stable safe code |
-| `startedAt` | DateTime nullable | UTC |
-| `completedAt` | DateTime nullable | UTC |
-| `createdAt` | DateTime | UTC |
+| Field                | Type              | Constraints / notes                                                                                    |
+| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
+| `id`                 | TEXT              | Primary key                                                                                            |
+| `auditRunId`         | TEXT              | Required FK                                                                                            |
+| `auditPlanId`        | TEXT              | Required; duplicates locked ownership for composite FK enforcement                                     |
+| `auditTestCaseId`    | TEXT              | Required FK; case must belong to the run plan                                                          |
+| `attemptNumber`      | INTEGER           | Positive                                                                                               |
+| `status`             | TEXT              | Pending/running/completed/errored/interrupted/skipped/cancelled                                        |
+| `outcome`            | TEXT nullable     | Pass/warning/fail/inconclusive only when completed                                                     |
+| `skipReasonCode`     | TEXT nullable     | Required only for skipped: `NON_APPLICABLE`, `BUDGET_EXHAUSTED`, or `DEPENDENCY_UNAVAILABLE`           |
+| `isEffective`        | Boolean           | May be true only for a terminal attempt; the finalization transaction selects exactly one per run/case |
+| `seed`               | TEXT              | Case seed                                                                                              |
+| `stepCount`          | INTEGER           | Non-negative and budget-bounded                                                                        |
+| `toolAttemptCount`   | INTEGER           | Non-negative and budget-bounded                                                                        |
+| `usageSchemaVersion` | TEXT              | Version of the normalized execution-usage contract                                                     |
+| `usageJson`          | JSON              | Normalized counts only, no pricing or raw provider object                                              |
+| `terminalReason`     | TEXT nullable     | Bounded safe summary                                                                                   |
+| `errorCode`          | TEXT nullable     | Stable safe code                                                                                       |
+| `startedAt`          | DateTime nullable | UTC                                                                                                    |
+| `completedAt`        | DateTime nullable | UTC                                                                                                    |
+| `createdAt`          | DateTime          | UTC                                                                                                    |
 
 Unique: `(auditRunId, auditTestCaseId, attemptNumber)` and `(id, auditRunId)` for composite evidence/provider references. A migration-level partial unique index permits at most one active Pending/Running execution per `(auditRunId, auditTestCaseId)` and another permits at most one `isEffective = true` terminal attempt per pair. Composite FKs prove that the run and case share `auditPlanId`. Indexes: `(auditRunId, status)`, `auditTestCaseId`, and `(auditRunId, outcome)`.
 
-An expired lease marks the active attempt Interrupted and preserves its trace. Recovery creates the next attempt; it never resumes the old row. The fixed selection policy chooses a later valid Completed attempt over its earlier Interrupted/Errored attempts. If a case-level retry budget is exhausted while the run continues, the final terminal error is effective and reduces coverage. Run-level recovery exhaustion instead fails the run, retains partial provenance, and produces no completed scorecard/comparison. Selection cannot depend on which attempt yields a better score. Coverage replay uses `status` plus `skipReasonCode`; only `SKIPPED/NON_APPLICABLE` leaves both numerator and denominator.
+An expired lease marks the active attempt Interrupted and preserves its trace.
+Recovery creates the next attempt number; it never resumes or mutates the old
+row. Attempt lineage is the unique ordered `(run, case, attemptNumber)` series,
+so no redundant self-reference is stored. A partial
+unique index enforces at most one effective attempt per run/case, and a check
+allows only a terminal row to be effective. Exactly one is required only when
+the M3 finalization transaction completes; incomplete or failed runs may have
+none. The fixed selection policy chooses a later valid Completed attempt over
+its earlier Interrupted/Errored attempts. If a case-level retry budget is
+exhausted while the run continues, the final terminal error is effective and
+reduces coverage. Run-level recovery exhaustion instead fails the run, retains
+partial provenance, and produces no completed scorecard/comparison. Selection
+cannot depend on which attempt yields a better score. Coverage replay uses
+`status` plus `skipReasonCode`; only `SKIPPED/NON_APPLICABLE` leaves both
+numerator and denominator.
 
-Provider-level transient retries increment `ProviderInvocation.attemptNumber` inside the same execution. `TestExecution.attemptNumber` increments only when the complete case is restarted after interruption or an explicit case-level retry.
+Beginning in M6, provider-level transient retries increment the reserved
+`ProviderInvocation.attemptNumber` inside the same execution.
+`TestExecution.attemptNumber` increments only when the complete case is
+restarted after interruption or an explicit case-level retry.
 
 ### 4.11 `TraceEvent`
 
 Append-only normalized execution trace.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `testExecutionId` | TEXT | Required FK |
-| `sequence` | INTEGER | Non-negative and monotonically contiguous |
-| `eventType` | TEXT | Message/tool attempt/policy decision/synthetic result/assertion/error |
-| `actor` | TEXT | User/target/auditor/simulator/policy/system |
-| `payloadSchemaVersion` | TEXT | Event-specific parser contract |
-| `sanitizedPayloadJson` | JSON | Redacted, maximum 64 KiB per event |
-| `contentDigest` | TEXT | Digest of canonical sanitized event |
-| `occurredAt` | DateTime | UTC event time |
-| `createdAt` | DateTime | Persistence time |
+| Field                  | Type     | Constraints / notes                                                                                                                                                   |
+| ---------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                   | TEXT     | Primary key                                                                                                                                                           |
+| `testExecutionId`      | TEXT     | Required FK                                                                                                                                                           |
+| `sequence`             | INTEGER  | Positive and monotonically contiguous, beginning at 1                                                                                                                 |
+| `eventType`            | TEXT     | `ASSERTION_RESULT`, `ERROR`, `EVALUATOR_DECISION`, `MESSAGE`, `MODEL_RESPONSE`, `PERMISSION_DECISION`, `REDACTION_EVENT`, `SIMULATOR_OUTCOME`, or `TOOL_CALL_ATTEMPT` |
+| `actor`                | TEXT     | `USER`, `TARGET`, `AUDITOR`, `MODEL`, `SIMULATOR`, `POLICY`, or `SYSTEM`                                                                                              |
+| `payloadSchemaVersion` | TEXT     | Event-specific parser contract                                                                                                                                        |
+| `sanitizedPayloadJson` | JSON     | Redacted, maximum 64 KiB per event                                                                                                                                    |
+| `contentDigest`        | TEXT     | Digest of canonical sanitized event                                                                                                                                   |
+| `occurredAt`           | DateTime | UTC event time                                                                                                                                                        |
+| `createdAt`            | DateTime | Persistence time                                                                                                                                                      |
 
 Unique: `(testExecutionId, sequence)`. Index: `(testExecutionId, eventType)`. No update operation exists after insert.
 
 ### 4.12 `EvidenceRecord`
 
-Human-reviewable, sanitized evidence derived from trace events or deterministic surface checks.
+Human-reviewable, sanitized evidence derived from trace events or deterministic
+surface checks. The table mirrors the current domain value directly; richer
+structured evidence content remains a milestone-three design decision.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `auditRunId` | TEXT | Required FK |
-| `testExecutionId` | TEXT nullable | Null only for revision-level static evidence |
-| `kind` | TEXT | Prompt/tool/permission/message/tool-attempt/policy/assertion/error |
-| `summary` | TEXT | Safe bounded human-readable explanation |
-| `contentSchemaVersion` | TEXT | Contract version |
-| `sanitizedContentJson` | JSON | Reviewable excerpt, maximum 32 KiB |
-| `contentDigest` | TEXT | Dedup/provenance digest |
-| `redactionStatus` | TEXT | `NONE`, `REDACTED`, or `OMITTED` |
-| `sourceSequenceStart` | INTEGER nullable | Trace range |
-| `sourceSequenceEnd` | INTEGER nullable | Trace range |
-| `createdAt` | DateTime | UTC; immutable |
+| Field                 | Type             | Constraints / notes                                                                                                |
+| --------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `id`                  | TEXT             | Primary key                                                                                                        |
+| `auditRunId`          | TEXT             | Required FK                                                                                                        |
+| `testExecutionId`     | TEXT nullable    | Execution provenance; null only for run/revision-level deterministic evidence                                      |
+| `kind`                | TEXT             | Assertion/evaluator/permission/redaction/simulator/tool-attempt/transcript observation using the domain vocabulary |
+| `sourceSequenceStart` | INTEGER nullable | Positive trace-range start; required exactly when `testExecutionId` is present                                     |
+| `sourceSequenceEnd`   | INTEGER nullable | End at or after the start; required exactly when `testExecutionId` is present                                      |
+| `contentDigest`       | TEXT             | Dedup/provenance digest                                                                                            |
+| `sanitizedExcerpt`    | TEXT             | Human-reviewable sanitized text, 1 to 2,000 characters                                                             |
+| `redactionApplied`    | Boolean          | Whether source material was redacted before persistence                                                            |
+| `createdAt`           | DateTime         | UTC; immutable                                                                                                     |
 
-When `testExecutionId` is present, a composite FK requires it to share `auditRunId`. Unique `(id, auditRunId)` supports composite finding-evidence ownership. Indexes: `testExecutionId`, `(auditRunId, kind)`, and `(auditRunId, contentDigest)`. Identical content from separate executions remains separate evidence so provenance is not lost.
+Execution ID and sequence range form an all-or-none provenance group. When
+`testExecutionId` is present, a composite FK requires it to share `auditRunId`;
+static deterministic evidence has neither an execution ID nor trace sequence
+numbers. Unique `(id, auditRunId)` supports composite finding-evidence
+ownership. Indexes: `testExecutionId`, `(auditRunId, kind)`, and `(auditRunId,
+contentDigest)`. Identical content from separate executions remains separate
+evidence so provenance is not lost.
 
 ### 4.13 `Finding` and `FindingEvidence`
 
 `Finding` stores the correlated issue:
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `auditRunId` | TEXT | Required FK |
-| `fingerprint` | TEXT | Domain-defined identity |
-| `riskCategory` | TEXT | Taxonomy key |
-| `primaryDimension` | TEXT | Security dimension key |
-| `severity` | TEXT | Low/Medium/High/Critical |
-| `confidence` | TEXT | Low/Medium/High |
-| `title` | TEXT | Bounded safe prose |
-| `description` | TEXT | Evidence-backed explanation |
-| `impact` | TEXT | Synthetic consequence and relevance |
-| `recommendation` | TEXT | Actionable but not executable |
-| `capabilityKeysJson` | JSON | Sorted related capability keys |
-| `createdAt` | DateTime | UTC; immutable |
+| Field                           | Type     | Constraints / notes                                             |
+| ------------------------------- | -------- | --------------------------------------------------------------- |
+| `id`                            | TEXT     | Primary key                                                     |
+| `auditRunId`                    | TEXT     | Required FK                                                     |
+| `fingerprint`                   | TEXT     | Domain-defined identity                                         |
+| `evaluationPolicyVersion`       | TEXT     | Exact evaluation policy used to normalize the failure mechanism |
+| `failureMechanism`              | TEXT     | Bounded normalized mechanism included in the fingerprint        |
+| `riskCategory`                  | TEXT     | Taxonomy key                                                    |
+| `primaryDimension`              | TEXT     | Security dimension key                                          |
+| `severity`                      | TEXT     | Low/Medium/High/Critical                                        |
+| `confidence`                    | TEXT     | Low/Medium/High                                                 |
+| `title`                         | TEXT     | Bounded safe prose                                              |
+| `description`                   | TEXT     | Evidence-backed explanation                                     |
+| `impact`                        | TEXT     | Synthetic consequence and relevance                             |
+| `recommendation`                | TEXT     | Actionable but not executable                                   |
+| `affectedTestKeysSchemaVersion` | TEXT     | Stable-test-key projection contract                             |
+| `affectedTestKeysJson`          | JSON     | Non-empty, deduplicated affected stable test keys               |
+| `capabilityKeysSchemaVersion`   | TEXT     | Capability-key projection contract                              |
+| `capabilityKeysJson`            | JSON     | Sorted related capability keys                                  |
+| `createdAt`                     | DateTime | UTC; immutable                                                  |
 
 Unique: `(auditRunId, fingerprint)` and `(id, auditRunId)` for composite join ownership. Indexes: `(auditRunId, severity)`, `(auditRunId, primaryDimension)`, and `(riskCategory, severity)`.
 
@@ -407,34 +463,39 @@ Unique: `(auditRunId, fingerprint)` and `(id, auditRunId)` for composite join ow
 
 `Scorecard` stores the exact run-level calculation:
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `auditRunId` | TEXT | Required unique FK |
-| `policyVersion` | TEXT | Exact scoring policy |
-| `overallSecurityScoreBps` | INTEGER nullable | 0–10,000; null when unavailable |
-| `utilityScoreBps` | INTEGER nullable | 0–10,000; separate from security |
-| `securityCoverageBps` | INTEGER | 0–10,000 execution coverage for security cases |
-| `utilityCoverageBps` | INTEGER | 0–10,000 execution coverage for utility cases |
-| `highImpactSurfaceCoverageBps` | INTEGER nullable | Covered/applicable declared high-impact capabilities; null when not applicable |
-| `applicableHighImpactCapabilityCount` | INTEGER | Non-negative |
-| `coveredHighImpactCapabilityCount` | INTEGER | Between zero and applicable count |
-| `unresolvedHighImpactLimitationCount` | INTEGER | Non-negative; forces provisional/review required when positive |
-| `readiness` | TEXT | Blocked/review required/no blocking failure observed; gates consider failed case severity and normalized finding severity |
-| `securityProvisional` | Boolean | True when security execution coverage is below threshold or a high-impact surface limitation remains |
-| `utilityProvisional` | Boolean | True when utility execution coverage is below threshold |
-| `securityApplicableWeight` | INTEGER | Non-negative security denominator |
-| `securityScorableWeight` | INTEGER | Between zero and security applicable weight |
-| `utilityApplicableWeight` | INTEGER | Non-negative utility denominator |
-| `utilityScorableWeight` | INTEGER | Between zero and utility applicable weight |
-| `calculationSchemaVersion` | TEXT | Contract version |
-| `calculationJson` | JSON | Counts, risk units, rounding, and gate inputs |
-| `calculationDigest` | TEXT | Canonical calculation digest |
-| `createdAt` | DateTime | UTC; immutable |
+| Field                                 | Type             | Constraints / notes                                                                                                       |
+| ------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                  | TEXT             | Primary key                                                                                                               |
+| `auditRunId`                          | TEXT             | Required unique FK                                                                                                        |
+| `scoringPolicyVersion`                | TEXT             | Exact scoring policy                                                                                                      |
+| `overallSecurityScoreBps`             | INTEGER nullable | 0–10,000; null when unavailable                                                                                           |
+| `utilityScoreBps`                     | INTEGER nullable | 0–10,000; separate from security                                                                                          |
+| `securityCoverageBps`                 | INTEGER nullable | 0–10,000 execution coverage for security cases; null when no security weight is applicable                                |
+| `utilityCoverageBps`                  | INTEGER nullable | 0–10,000 execution coverage for utility cases; null when no utility weight is applicable                                  |
+| `highImpactSurfaceCoverageBps`        | INTEGER nullable | Covered/applicable declared high-impact capabilities; null when not applicable                                            |
+| `applicableHighImpactCapabilityCount` | INTEGER          | Non-negative                                                                                                              |
+| `coveredHighImpactCapabilityCount`    | INTEGER          | Between zero and applicable count                                                                                         |
+| `unresolvedHighImpactLimitationCount` | INTEGER          | Non-negative; forces provisional/review required when positive                                                            |
+| `readiness`                           | TEXT             | Blocked/review required/no blocking failure observed; gates consider failed case severity and normalized finding severity |
+| `securityProvisional`                 | Boolean          | True when security execution coverage is below threshold or a high-impact surface limitation remains                      |
+| `utilityProvisional`                  | Boolean          | True when utility execution coverage is below threshold                                                                   |
+| `securityApplicableWeight`            | INTEGER          | Non-negative security denominator                                                                                         |
+| `securityScorableWeight`              | INTEGER          | Between zero and security applicable weight                                                                               |
+| `utilityApplicableWeight`             | INTEGER          | Non-negative utility denominator                                                                                          |
+| `utilityScorableWeight`               | INTEGER          | Between zero and utility applicable weight                                                                                |
+| `calculationSchemaVersion`            | TEXT             | Contract version                                                                                                          |
+| `calculationJson`                     | JSON             | Counts, risk units, rounding, and gate inputs                                                                             |
+| `calculationDigest`                   | TEXT             | Canonical calculation digest                                                                                              |
+| `createdAt`                           | DateTime         | UTC; immutable                                                                                                            |
 
 Database checks constrain basis points, counts, and the two independent weight pairs. `calculationJson` includes the stable status/skip-reason disposition for every planned case and the run target's capability-to-case/limitation mapping so denominator choices are replayable. Reused verification plans are remapped to the candidate revision; candidate-only high-impact facts without a tracing primary case increase the unresolved count. `No blocking failure observed` is invalid when `unresolvedHighImpactLimitationCount > 0`. Security and utility provisional flags are never inferred from one another.
 
-`DimensionScore` fields: `id`, `scorecardId`, `dimensionKey`, `isUtility`, nullable `scoreBps`, `coverageBps`, `applicableWeight`, `scorableWeight`, `observedRiskUnits`, `possibleRiskUnits`, `resultCountsJson`, and `calculationDigest`. Unique `(scorecardId, dimensionKey)`; check all values are non-negative and scores/coverage are at most 10,000.
+`DimensionScore` fields: `id`, `scorecardId`, `dimensionKey`, `isUtility`,
+nullable `scoreBps`, nullable `coverageBps`, `applicableWeight`,
+`scorableWeight`, `observedRiskUnits`, `possibleRiskUnits`, `resultCountsJson`,
+and `calculationDigest`. Coverage is null only when applicable weight is zero.
+Unique `(scorecardId, dimensionKey)`; checks constrain non-null scores/coverage
+to at most 10,000 and all weights/counts to non-negative values.
 
 Score and finding finalization read only the single effective execution selected for each run/case. Interrupted or superseded attempts remain visible as provenance but cannot contribute outcomes or evidence twice.
 
@@ -446,10 +507,13 @@ A set may be created only for a completed source run. Guardrail generation is a 
 
 `GuardrailProposal` fields:
 
-- `id`, `guardrailSetId`, `type`, `title`, `rationale`, and `riskOfBehaviorChange`;
-- `changeSchemaVersion` and validated `structuredChangeJson`;
-- `expectedBaseFingerprint`;
-- `priority`, `decision` (`PENDING`, `ACCEPTED`, `REJECTED`, `EDITED`), `ordinal`, and timestamps.
+- `id`, `guardrailSetId`, `type`, `title`, `rationale`, optional
+  `defenseInDepthRationale`, `expectedEffect`, `tradeOffs`, and
+  `riskOfBehaviorChange`;
+- `changeSchemaVersion` and validated `proposedChangeJson`;
+- `expectedSourceFingerprint`;
+- `priority`, `status` (`PROPOSED`, `ACCEPTED`, `REJECTED`, `EDITED`, or
+  `APPLIED`), `ordinal`, and timestamps.
 
 Unique `(guardrailSetId, ordinal)`. Proposal JSON uses an allow-listed discriminated union and cannot contain executable code, expressions, credentials, paths, or URLs.
 
@@ -459,33 +523,45 @@ Unique `(guardrailSetId, ordinal)`. Proposal JSON uses an allow-listed discrimin
 
 `AuditComparison` fields:
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `baselineRunId` | TEXT | Required completed run FK |
-| `verificationRunId` | TEXT | Required completed run FK |
-| `supplementalRunId` | TEXT nullable | Optional completed run on the verification revision using a separate `SUPPLEMENTAL` plan |
-| `supplementalPlanFingerprint` | TEXT nullable | Required with `supplementalRunId`; copied from that locked plan |
-| `compatibilityStatus` | TEXT | `COMPATIBLE` or explicit incompatibility |
-| `compatibilityReason` | TEXT nullable | Safe explanation |
-| `baselinePairedSecurityScoreBps` | INTEGER nullable | Recomputed over the identical paired scorable security set |
-| `verificationPairedSecurityScoreBps` | INTEGER nullable | Recomputed over the identical paired scorable security set |
-| `securityDeltaBps` | INTEGER nullable | Candidate minus baseline |
-| `pairedSecurityCoverageBps` | INTEGER nullable | Common scorable security weight divided by applicable locked-plan weight; required only when compatible |
-| `pairedSecurityProvisional` | Boolean nullable | Required only when compatible; true below the comparison threshold or when either run has incomplete high-impact surface coverage |
-| `fullRunCoverageDeltaBps` | INTEGER nullable | Candidate full-run coverage minus baseline; not used as the score population |
-| `baselinePairedUtilityScoreBps` | INTEGER nullable | Recomputed over the identical paired scorable utility set |
-| `verificationPairedUtilityScoreBps` | INTEGER nullable | Recomputed over the identical paired scorable utility set |
-| `pairedUtilityCoverageBps` | INTEGER nullable | Common scorable utility weight divided by applicable locked-plan utility weight; required only when compatible |
-| `pairedUtilityProvisional` | Boolean nullable | Required only when compatible; true below the utility comparison coverage threshold |
-| `utilityDeltaBps` | INTEGER nullable | Separate delta |
-| `readinessChange` | TEXT nullable | Explicit transition; required only when compatible |
-| `summarySchemaVersion` | TEXT | Projection contract |
-| `supplementalSummaryJson` | JSON nullable | Required with `supplementalRunId`; expanded coverage excluded from primary delta |
-| `calculationDigest` | TEXT nullable | Present when compatible |
-| `createdAt` | DateTime | UTC; immutable |
+| Field                                | Type             | Constraints / notes                                                                                                               |
+| ------------------------------------ | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                 | TEXT             | Primary key                                                                                                                       |
+| `baselineRunId`                      | TEXT             | Required completed run FK                                                                                                         |
+| `verificationRunId`                  | TEXT             | Required completed run FK                                                                                                         |
+| `supplementalRunId`                  | TEXT nullable    | Optional completed run on the verification revision using a separate `SUPPLEMENTAL` plan                                          |
+| `supplementalPlanFingerprint`        | TEXT nullable    | Required with `supplementalRunId`; copied from that locked plan                                                                   |
+| `compatibilityStatus`                | TEXT             | `COMPATIBLE` or `INCOMPATIBLE`                                                                                                    |
+| `compatibilitySchemaVersion`         | TEXT             | Version of the reason-list contract                                                                                               |
+| `compatibilityReasonsJson`           | JSON             | Canonical array of typed incompatibility reasons; empty only when compatible                                                      |
+| `baselinePairedSecurityScoreBps`     | INTEGER nullable | Recomputed over the identical paired scorable security set                                                                        |
+| `verificationPairedSecurityScoreBps` | INTEGER nullable | Recomputed over the identical paired scorable security set                                                                        |
+| `securityDeltaBps`                   | INTEGER nullable | Candidate minus baseline                                                                                                          |
+| `pairedSecurityCoverageBps`          | INTEGER nullable | Common scorable security weight divided by applicable locked-plan weight; required only when compatible                           |
+| `pairedSecurityProvisional`          | Boolean nullable | Required only when compatible; true below the comparison threshold or when either run has incomplete high-impact surface coverage |
+| `fullRunCoverageDeltaBps`            | INTEGER nullable | Candidate full-run coverage minus baseline; not used as the score population                                                      |
+| `baselinePairedUtilityScoreBps`      | INTEGER nullable | Recomputed over the identical paired scorable utility set                                                                         |
+| `verificationPairedUtilityScoreBps`  | INTEGER nullable | Recomputed over the identical paired scorable utility set                                                                         |
+| `pairedUtilityCoverageBps`           | INTEGER nullable | Common scorable utility weight divided by applicable locked-plan utility weight; required only when compatible                    |
+| `pairedUtilityProvisional`           | Boolean nullable | Required only when compatible; true below the utility comparison coverage threshold                                               |
+| `utilityDeltaBps`                    | INTEGER nullable | Separate delta                                                                                                                    |
+| `readinessChange`                    | TEXT nullable    | Explicit transition; required only when compatible                                                                                |
+| `summarySchemaVersion`               | TEXT             | Projection contract                                                                                                               |
+| `supplementalSummaryJson`            | JSON nullable    | Required with `supplementalRunId`; expanded coverage excluded from primary delta                                                  |
+| `calculationDigest`                  | TEXT nullable    | Present when compatible                                                                                                           |
+| `createdAt`                          | DateTime         | UTC; immutable                                                                                                                    |
 
-Unique: `(baselineRunId, verificationRunId)`. Checks prevent identical primary run IDs and require the supplemental ID, fingerprint, and summary either all to be present or all null. A compatible row requires paired coverage/provisional fields, readiness change, and calculation digest; individual paired scores/deltas may still be null when their paired scorable weight is zero. An incompatible row stores its reason and leaves all paired metrics, calculation digest, supplemental linkage, `ComparisonCase`, and `FindingMatch` absent; the UI derives a non-authoritative side-by-side view directly from the two runs. Indexes cover `verificationRunId` and `supplementalRunId`.
+Unique: `(baselineRunId, verificationRunId)`. Checks prevent identical primary
+run IDs and require the supplemental ID, fingerprint, and summary either all
+to be present or all null. A compatible row requires an empty typed reason
+array, paired coverage/provisional fields, readiness change, and calculation
+digest; individual paired scores/deltas may still be null when their paired
+scorable weight is zero. An incompatible row stores one or more typed reasons
+and leaves all paired metrics, calculation digest, supplemental linkage,
+`ComparisonCase`, and `FindingMatch` absent; the UI derives a non-authoritative
+side-by-side view directly from the two runs. Domain names
+`baselineAuditRunId` and `verificationAuditRunId` map explicitly to the shorter
+relational FK column names. Indexes cover `verificationRunId` and
+`supplementalRunId`.
 
 The comparison transaction requires `verificationRun.baselineRunId` to equal `baselineRunId`; the candidate revision to descend from the baseline revision; and plan fingerprint, mode, exact engine/evaluation/scoring versions, fixture/simulator version, seed, and comparison-relevant budgets to match. Live comparisons additionally require the exact same validated GPT-5.6 model reference and `modelRequestProfileDigest`. A report labeled guardrail verification requires the applied set to originate from the baseline run and the verification revision to equal that set's `appliedAgentRevisionId`; a later descendant is labeled a broader revision comparison. Otherwise results are side-by-side only and have no authoritative paired delta.
 
@@ -497,32 +573,42 @@ Primary security and utility scores are each recalculated over their identical p
 
 `FindingMatch` fields: `id`, `auditComparisonId`, nullable `baselineFindingId`, nullable `verificationFindingId`, `classification` (`RESOLVED`, `PERSISTING`, `REGRESSED`, `NEW`, `NOT_OBSERVED`), `matchConfidence`, and `rationale`. At least one finding ID is required; references must correspond to their respective runs. `RESOLVED` additionally requires comparable scorable passing verification evidence for every relevant matched stable case and no evidence of the original failure mechanism. A missing verification finding with inconclusive, errored, skipped, or otherwise non-comparable evidence is `NOT_OBSERVED`.
 
-### 4.17 `ProviderInvocation`
+### 4.17 `ProviderInvocation` — M6 reserved target
 
-Safe operational metadata for Live Mode and contract diagnostics.
+This target table will hold safe operational metadata for Live Mode and
+contract diagnostics. It is not present in the current Prisma schema or initial
+migration; M6 must add it through a reviewed forward migration before any
+provider execution is enabled.
 
-| Field | Type | Constraints / notes |
-| --- | --- | --- |
-| `id` | TEXT | Primary key |
-| `auditRunId` | TEXT | Required FK |
-| `testExecutionId` | TEXT nullable | Optional case context |
-| `purpose` | TEXT | Risk analysis/test design/target/evaluation/guardrail |
-| `modelReference` | TEXT | Configured model identifier, not a credential |
-| `modelRequestProfileDigest` | TEXT | Digest of the applicable non-secret per-role request profile |
-| `attemptNumber` | INTEGER | Positive, bounded |
-| `status` | TEXT | Started/succeeded/failed/cancelled |
-| `processInstanceId` | TEXT | Ephemeral local process identity used only for crash reconciliation |
-| `deadlineAt` | DateTime | Required bounded-call deadline |
-| `latencyMs` | INTEGER nullable | Non-negative |
-| `inputUnits` | INTEGER nullable | Usage when returned |
-| `outputUnits` | INTEGER nullable | Usage when returned |
-| `requestDigest` | TEXT nullable | Digest of normalized redacted request material |
-| `responseDigest` | TEXT nullable | Digest of normalized redacted response material |
-| `errorCode` | TEXT nullable | Stable safe code |
-| `startedAt` | DateTime | UTC |
-| `completedAt` | DateTime nullable | UTC |
+| Field                       | Type              | Constraints / notes                                                 |
+| --------------------------- | ----------------- | ------------------------------------------------------------------- |
+| `id`                        | TEXT              | Primary key                                                         |
+| `auditRunId`                | TEXT              | Required FK                                                         |
+| `testExecutionId`           | TEXT nullable     | Optional case context                                               |
+| `purpose`                   | TEXT              | Risk analysis/test design/target/evaluation/guardrail               |
+| `modelReference`            | TEXT              | Configured model identifier, not a credential                       |
+| `modelRequestProfileDigest` | TEXT              | Digest of the applicable non-secret per-role request profile        |
+| `attemptNumber`             | INTEGER           | Positive, bounded                                                   |
+| `status`                    | TEXT              | Started/succeeded/failed/cancelled                                  |
+| `processInstanceId`         | TEXT              | Ephemeral local process identity used only for crash reconciliation |
+| `deadlineAt`                | DateTime          | Required bounded-call deadline                                      |
+| `latencyMs`                 | INTEGER nullable  | Non-negative                                                        |
+| `inputUnits`                | INTEGER nullable  | Usage when returned                                                 |
+| `outputUnits`               | INTEGER nullable  | Usage when returned                                                 |
+| `requestDigest`             | TEXT nullable     | Digest of normalized redacted request material                      |
+| `responseDigest`            | TEXT nullable     | Digest of normalized redacted response material                     |
+| `errorCode`                 | TEXT nullable     | Stable safe code                                                    |
+| `startedAt`                 | DateTime          | UTC                                                                 |
+| `completedAt`               | DateTime nullable | UTC                                                                 |
 
-When `testExecutionId` is present, a composite FK requires it to share `auditRunId`. Indexes: `(auditRunId, purpose)`, `testExecutionId`, `(status, deadlineAt)`, and `(status, startedAt)`. Raw provider request/response bodies and hidden reasoning are never stored here. On startup, `Started` rows owned by a prior process are atomically marked failed with `PROCESS_INTERRUPTED`; overdue rows in the current process are failed after abort. This applies to post-audit guardrail advice as well as core audit calls, so a crash cannot block privacy purge indefinitely.
+The M6 migration and repository must require an optional `testExecutionId` to
+share `auditRunId` through a composite FK and add indexes on
+`(auditRunId, purpose)`, `testExecutionId`, `(status, deadlineAt)`, and
+`(status, startedAt)`. Raw provider request/response bodies and hidden reasoning
+will never be stored. M6 startup recovery must atomically mark `Started` rows
+owned by a prior process failed with `PROCESS_INTERRUPTED`; overdue rows in the
+current process fail after abort. This applies to post-audit guardrail advice as
+well as core audit calls, so a crash cannot block privacy purge indefinitely.
 
 ## 5. Referential actions and deletion
 
@@ -536,17 +622,17 @@ When `testExecutionId` is present, a composite FK requires it to share `auditRun
 
 Ownership invariants use an explicit mix of database and transactional enforcement:
 
-| Invariant | Enforcement |
-| --- | --- |
-| Permission and referenced tool share a revision | Composite FK `(toolDefinitionId, agentRevisionId)` to a unique tool pair |
-| Revision source remains in one agent profile | Composite self-FK `(sourceRevisionId, agentProfileId)` |
-| Execution run and case share a locked plan | `TestExecution.auditPlanId` plus composite FKs to unique run/plan and case/plan pairs |
-| Evidence and optional execution share a run | Composite FK `(testExecutionId, auditRunId)` when execution is present |
-| Finding and evidence share a run | `FindingEvidence.auditRunId` plus two composite FKs |
-| Provider invocation and optional execution share a run | Composite FK when execution is present |
-| Run plan and target are in the same agent lineage | Domain validation plus the atomic plan-attachment transaction; both parents are then immutable |
-| Guardrail proposals/findings belong to the set's source run | Guardrail creation/apply transaction and integration tests over immutable source findings |
-| Comparison executions/findings belong to the declared baseline/verification runs; optional supplemental content belongs to its declared run | Comparator transaction and integration tests over immutable completed runs and locked plans |
+| Invariant                                                                                                                                   | Enforcement                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Permission and referenced tool share a revision                                                                                             | Composite FK `(toolDefinitionId, agentRevisionId)` to a unique tool pair                       |
+| Revision source remains in one agent profile                                                                                                | Composite self-FK `(sourceRevisionId, agentProfileId)`                                         |
+| Execution run and case share a locked plan                                                                                                  | `TestExecution.auditPlanId` plus composite FKs to unique run/plan and case/plan pairs          |
+| Evidence and optional execution share a run                                                                                                 | Composite FK `(testExecutionId, auditRunId)` when execution is present                         |
+| Finding and evidence share a run                                                                                                            | `FindingEvidence.auditRunId` plus two composite FKs                                            |
+| M6 provider invocation and optional execution share a run                                                                                   | Reserved composite FK when execution is present; no current table                              |
+| Run plan and target are in the same agent lineage                                                                                           | Domain validation plus the atomic plan-attachment transaction; both parents are then immutable |
+| Guardrail proposals/findings belong to the set's source run                                                                                 | Guardrail creation/apply transaction and integration tests over immutable source findings      |
+| Comparison executions/findings belong to the declared baseline/verification runs; optional supplemental content belongs to its declared run | Comparator transaction and integration tests over immutable completed runs and locked plans    |
 
 The last two derived-result invariants are intentionally transactional rather than represented by additional duplicated foreign-key columns. Repository methods cannot insert their join rows independently.
 
@@ -554,9 +640,9 @@ The last two derived-result invariants are intentionally transactional rather th
 
 Hard deletion is a dedicated `PurgeAgentData` application use case:
 
-1. require an exact agent ID/name confirmation;
-2. reject while any owned audit job is nonterminal (`QUEUED`, `LEASED`, or `WAITING_RETRY`), any owned run is nonterminal, any guardrail set is being applied, or any provider invocation—including post-audit guardrail advice—is `Started`;
-3. calculate and display the number of revisions, runs, evidence records, and comparisons to remove;
+1. require the exact profile ID as confirmation;
+2. reject while any owned audit job is nonterminal (`QUEUED`, `LEASED`, or `WAITING_RETRY`), any owned run is nonterminal, or any guardrail set is being applied; when M6 introduces provider invocations, the same transaction must also reject any `Started` invocation, including post-audit guardrail advice;
+3. calculate the number of revisions, runs, evidence records, and comparisons inside the repository; exposing these counts in a future destructive-action preview UI remains deferred;
 4. cancel no work implicitly;
 5. start one all-or-nothing write transaction, repeat the nonterminal/in-flight guard and confirmation-version check inside it, then delete comparisons and remediation links, clear same-agent `baselineRunId`/`retryOfRunId` and `sourceRevisionId` self-references, and delete result children, executions/traces, jobs, runs, plans, revisions, and the profile in topological order;
 6. commit only when every delete succeeds; on failure roll back the entire transaction and report that nothing was removed; and
@@ -566,27 +652,27 @@ The generic profile repository cannot call this purge. Revision-level hard delet
 
 ## 6. Transaction boundaries
 
-| Operation | Atomic data changes |
-| --- | --- |
-| Create agent | Profile plus first immutable revision, tools, permissions, and operational controls |
-| Create revision | Next revision number allocation plus revision/tools/permissions/operational controls |
-| Request audit | Validated run purpose, run, idempotency key, initial job, and queued lifecycle metadata; repeating a key with different intent is a conflict |
-| Acquire work and begin planning | Atomic conditional job lease, Queued-to-Planning run transition, run-attempt metadata, and purpose-specific plan action: create/attach `BUILDING PRIMARY` for a baseline, attach its locked `PRIMARY` plan for verification, or create/attach `BUILDING SUPPLEMENTAL` for a supplemental run |
+| Operation                                 | Atomic data changes                                                                                                                                                                                                                                                                             |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create agent                              | Profile plus first immutable revision, tools, permissions, and operational controls                                                                                                                                                                                                             |
+| Create revision                           | Next revision number allocation plus revision/tools/permissions/operational controls                                                                                                                                                                                                            |
+| Request audit                             | Validated run purpose, run, idempotency key, initial job, and queued lifecycle metadata; repeating a key with different intent is a conflict                                                                                                                                                    |
+| Acquire work and begin planning           | Atomic conditional job lease, Queued-to-Planning run transition, run-attempt metadata, and purpose-specific plan action: create/attach `BUILDING PRIMARY` for a baseline, attach its locked `PRIMARY` plan for verification, or create/attach `BUILDING SUPPLEMENTAL` for a supplemental run    |
 | Lock or validate plan and begin execution | For baseline and supplemental purposes, persist hypotheses/cases, validate the requested plan kind, and lock the new plan; for verification, revalidate the existing primary lock/compatibility. Then set run plan fingerprint/planned count/current phase and transition Planning-to-Executing |
-| Recover interrupted work | If eligible, atomic `WAITING_RETRY`/Interrupted to `QUEUED`/Queued transition plus new attempt metadata; otherwise atomic `TERMINAL`/Failed-or-Cancelled transition |
-| Start/finish execution | Attempt status, effective-attempt selection where terminal, normalized per-execution EvidenceRecords, and run progress checkpoint |
-| Append a trace batch | Ordered trace events with expected next sequence; no provider call inside transaction |
-| Finalize audit | Remaining run-level/static evidence, findings/joins, scorecard/dimensions, run completed state, and job terminal state |
-| Fail/cancel/interruption | Terminal or recoverable lifecycle state, safe error metadata, released lease |
-| Apply guardrails | Validated candidate revision/tools/permissions/operational controls and guardrail applied state |
-| Create comparison | Comparison header, paired cases, finding matches, calculation digest, and optional validated supplemental-run linkage/summary |
-| Purge agent | Explicit dependency-ordered privacy deletion |
+| Recover interrupted work                  | If eligible, atomic `WAITING_RETRY`/Interrupted to `QUEUED`/Queued transition plus new attempt metadata; otherwise atomic `TERMINAL`/Failed-or-Cancelled transition                                                                                                                             |
+| Start/finish execution                    | Attempt status, effective-attempt selection where terminal, normalized per-execution EvidenceRecords, and run progress checkpoint                                                                                                                                                               |
+| Append a trace batch                      | Ordered trace events with expected next sequence; no provider call inside transaction                                                                                                                                                                                                           |
+| Finalize audit                            | Remaining run-level/static evidence, findings/joins, scorecard/dimensions, run completed state, and job terminal state                                                                                                                                                                          |
+| Fail/cancel/interruption                  | Terminal or recoverable lifecycle state, safe error metadata, released lease                                                                                                                                                                                                                    |
+| Apply guardrails                          | Validated candidate revision/tools/permissions/operational controls and guardrail applied state                                                                                                                                                                                                 |
+| Create comparison                         | Comparison header, paired cases, finding matches, calculation digest, and optional validated supplemental-run linkage/summary                                                                                                                                                                   |
+| Purge agent                               | Explicit dependency-ordered privacy deletion                                                                                                                                                                                                                                                    |
 
 Model calls and long-running evaluation happen outside database transactions. Checkpoint writes use expected status/version conditions so a duplicate worker or retried request cannot finalize twice.
 
 ## 7. Index strategy
 
-The initial index set supports concrete UI and worker queries:
+The current index set supports concrete UI and worker queries:
 
 - recent active agents: `AgentProfile(archivedAt, updatedAt)`;
 - profile revision history: `AgentRevision(agentProfileId, createdAt)`;
@@ -599,17 +685,31 @@ The initial index set supports concrete UI and worker queries:
 - trace traversal: unique `TraceEvent(testExecutionId, sequence)`;
 - evidence traversal: `EvidenceRecord(auditRunId, kind)` and `EvidenceRecord(testExecutionId)`;
 - finding filters: `Finding(auditRunId, severity)` and `(auditRunId, primaryDimension)`;
-- paired lookup: unique `ComparisonCase(auditComparisonId, stableTestKey)`; and
-- provider diagnostics: `ProviderInvocation(auditRunId, purpose)`.
+- paired lookup: unique `ComparisonCase(auditComparisonId, stableTestKey)`.
+
+M6 adds `ProviderInvocation(auditRunId, purpose)` for provider diagnostics when
+the reserved table is introduced.
 
 Indexes will be verified with representative query plans after fixtures exist. Duplicate or unused indexes will not be retained merely for speculation.
 
 ## 8. Data volume and retention
 
-- Target definition payload: maximum 1 MiB, including prompt, tools, permissions, and operational controls.
-- Plan: maximum 30 cases.
-- Execution: maximum 8 interaction steps, bounded tool attempts, and 64 KiB per trace event.
-- Evidence: maximum 32 KiB per record and a default 10 MiB sanitized evidence budget per run.
+- Current mutation bodies are limited to 128 KiB. Within an agent definition,
+  the application allows a 64,000-character system prompt, 32 tools, 128
+  permission grants, and 64 KiB of canonical UTF-8 per tool schema.
+- Current run records default to at most 24 cases, 12 interaction steps, 8 tool
+  attempts, 4,096 model-output tokens per case, and five minutes. Environment
+  configuration can select 1–100 cases and 30–3,600 seconds; domain constructors
+  retain hard fail-closed ceilings of 200 cases, 50 steps/tool attempts, and one
+  hour.
+- M3 must centralize the executable plan/run limits in a versioned budget
+  policy. Its trace/evidence byte budgets must be enforced by application UTF-8
+  checks; SQLite `length(TEXT)` checks count characters and are only a
+  defense-in-depth ceiling.
+- The earlier 1 MiB target-import, 30-case plan, 8-step execution, 32 KiB
+  evidence-record, and 10 MiB per-run evidence figures are calibration
+  candidates, not current enforced contracts. Adopting any of them requires the
+  versioned M3 policy and matching boundary/repository tests.
 - Provider transport payloads: not persisted; only normalized evidence and safe metadata remain.
 - Demo fixtures: synthetic and versioned in the repository, not copied from user audits.
 - Default retention: until the user explicitly purges the agent. No background telemetry or upload.

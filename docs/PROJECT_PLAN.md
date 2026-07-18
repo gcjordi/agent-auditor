@@ -4,12 +4,12 @@
 
 This document defines the delivery charter for the first production-quality, local-first release of Agent Auditor. It establishes scope, success criteria, requirements, milestones, risks, assumptions, quality gates, and the documentation and build strategy.
 
-| Property | Value |
-| --- | --- |
-| Status | Proposed planning baseline awaiting owner approval |
-| Planning horizon | MVP and immediate post-MVP |
-| Implementation state | Not started |
-| Source of truth | This document governs scope; architectural detail lives in the linked design documents. |
+| Property             | Value                                                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Status               | Approved baseline; M1/M2 foundation implemented                                                             |
+| Planning horizon     | MVP and immediate post-MVP                                                                                  |
+| Implementation state | Engineering, domain, persistence, API, UI-shell, and quality foundations are present; M3-M7 remain planned. |
+| Source of truth      | This document governs scope; architectural detail lives in the linked design documents.                     |
 
 ## 1. Product charter
 
@@ -32,26 +32,26 @@ The MVP succeeds when it can:
 
 ### 1.2 Success indicators
 
-| Indicator | MVP acceptance target |
-| --- | --- |
-| Offline readiness | The bundled demonstration completes with no API key and no outbound external runtime request; browser-to-loopback HTTP remains local. |
-| Evidence traceability | 100% of findings reference persisted, sanitized evidence and a test execution. |
-| Tool isolation | Automated misuse tests demonstrate that declarations cannot invoke shell, network, filesystem, dynamic code, or external tools. |
-| Comparison integrity | Primary score deltas are recomputed over only the matched cases that are scorable on both sides of the same locked plan and evaluation/scoring policy versions. |
-| Reproducible demo | Repeated Demo Mode runs over the same target revision produce the same plan, outcomes, findings, and scores. |
-| Secret handling | API keys never appear in browser payloads, SQLite, evidence, error responses, or logs. |
-| Accessibility | The complete critical path meets WCAG 2.2 AA checks and is usable by keyboard without relying on color. |
-| Quality | All required static checks, tests, migration checks, builds, and Demo Mode end-to-end tests pass in a keyless CI run. |
+| Indicator             | MVP acceptance target                                                                                                                                           |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Offline readiness     | The bundled demonstration completes with no API key and no outbound external runtime request; browser-to-loopback HTTP remains local.                           |
+| Evidence traceability | 100% of findings reference persisted, sanitized evidence and a test execution.                                                                                  |
+| Tool isolation        | Automated misuse tests demonstrate that declarations cannot invoke shell, network, filesystem, dynamic code, or external tools.                                 |
+| Comparison integrity  | Primary score deltas are recomputed over only the matched cases that are scorable on both sides of the same locked plan and evaluation/scoring policy versions. |
+| Reproducible demo     | Repeated Demo Mode runs over the same target revision produce the same plan, outcomes, findings, and scores.                                                    |
+| Secret handling       | API keys never appear in browser payloads, SQLite, evidence, error responses, or logs.                                                                          |
+| Accessibility         | The complete critical path meets WCAG 2.2 AA checks and is usable by keyboard without relying on color.                                                         |
+| Quality               | All required static checks, tests, migration checks, builds, and Demo Mode end-to-end tests pass in a keyless CI run.                                           |
 
 ## 2. Users and primary jobs
 
-| User | Primary job | Required experience |
-| --- | --- | --- |
-| AI developer | Find unsafe instruction/tool interactions before integration | Fast setup, actionable evidence, concrete guardrail diff |
-| AI startup | Establish a repeatable release check for agent behavior | Deterministic demo, version history, comparable reruns |
-| Security team | Investigate abuse paths and permission failures | Test provenance, detailed transcripts, severity and confidence |
-| Consultant | Explain risk and improvement to a client | Clear summaries, defensible evidence, honest limitations |
-| AI governance team | Review controls and auditability | Transparent evaluation/scoring policies, immutable records, coverage and lifecycle metadata |
+| User               | Primary job                                                  | Required experience                                                                         |
+| ------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| AI developer       | Find unsafe instruction/tool interactions before integration | Fast setup, actionable evidence, concrete guardrail diff                                    |
+| AI startup         | Establish a repeatable release check for agent behavior      | Deterministic demo, version history, comparable reruns                                      |
+| Security team      | Investigate abuse paths and permission failures              | Test provenance, detailed transcripts, severity and confidence                              |
+| Consultant         | Explain risk and improvement to a client                     | Clear summaries, defensible evidence, honest limitations                                    |
+| AI governance team | Review controls and auditability                             | Transparent evaluation/scoring policies, immutable records, coverage and lifecycle metadata |
 
 ### 2.1 Primary journey
 
@@ -106,45 +106,45 @@ Report export, custom rule packs, external agent connectors, and multi-user gove
 
 ## 4. Foundational decisions and assumptions
 
-| Topic | Planning decision |
-| --- | --- |
-| Audit subject | The MVP audits an in-application definition, not a remote running agent. |
-| Unit of history | Each audit references one immutable target revision and stores engine, plan, evaluation-policy, scoring-policy, mode, and model metadata. |
-| Demo Mode | Default, deterministic, keyless, and free of outbound external runtime calls. It adapts templates to declared capabilities and labels all behavior as simulated. |
-| Live Mode | Optional server-side OpenAI integration restricted to validated GPT-5.6 identifiers or snapshots. The requested `gpt-5.6` default, exact model access, and API compatibility must be verified at implementation kickoff. |
-| OpenAI API surface | The Responses API is the planned boundary, isolated behind an application port so API details do not enter the domain. |
-| Tools | Tool schemas are untrusted data. Calls are intercepted and answered only by synthetic in-process simulators. |
-| Evaluation | Deterministic assertions are primary where possible; model-assisted judgments must be structured, validated, evidenced, and allowed to be inconclusive. |
-| Evaluation policy | The versioned evaluation policy maps traces to outcomes, findings, severity, and confidence; it is distinct from the numeric scoring policy. |
-| Scoring | Higher is safer. The original formula is public and versioned. Coverage and readiness gates are displayed beside the score. |
-| Guardrails | Proposals are reviewable diffs. Applying one creates a new revision and never mutates the baseline. |
-| Verification | Primary deltas are recomputed over stable cases scorable on both sides while plan, mode, exact Live model/request profile, fixture, seed, budgets, engine, and evaluation/scoring policies are held compatible. The candidate must descend from the baseline revision; a report labeled guardrail verification targets exactly the revision applied by the baseline-origin set. New tests and non-comparable cases are shown separately. Utility cases prevent blanket refusal from appearing safer. |
-| Persistence | Prisma and SQLite, with no user or tenant tables. The database is local plaintext unless the user provides filesystem-level protection. |
-| Runtime | One local Node.js process, loopback binding by default, with a persisted in-process job coordinator and no external queue. |
-| Language | UI, bundled test content, findings, and documentation are English only. |
-| Clean-room scope | All taxonomy, templates, scoring, prompts, and implementation will be original and derived only from the requirements and artifacts created in this repository. |
-| Licensing | Apache License 2.0; copyright notice is “Copyright 2026 Jordi Garcia Castillón.” The standard license text remains unmodified. |
+| Topic              | Planning decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Audit subject      | The MVP audits an in-application definition, not a remote running agent.                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Unit of history    | Each audit references one immutable target revision and stores engine, plan, evaluation-policy, scoring-policy, mode, and model metadata.                                                                                                                                                                                                                                                                                                                                                            |
+| Demo Mode          | Default, deterministic, keyless, and free of outbound external runtime calls. It adapts templates to declared capabilities and labels all behavior as simulated.                                                                                                                                                                                                                                                                                                                                     |
+| Live Mode          | Optional server-side OpenAI integration restricted to validated GPT-5.6 identifiers or snapshots. The requested `gpt-5.6` default, exact model access, and API compatibility must be verified at implementation kickoff.                                                                                                                                                                                                                                                                             |
+| OpenAI API surface | The Responses API is the planned boundary, isolated behind an application port so API details do not enter the domain.                                                                                                                                                                                                                                                                                                                                                                               |
+| Tools              | Tool schemas are untrusted data. Calls are intercepted and answered only by synthetic in-process simulators.                                                                                                                                                                                                                                                                                                                                                                                         |
+| Evaluation         | Deterministic assertions are primary where possible; model-assisted judgments must be structured, validated, evidenced, and allowed to be inconclusive.                                                                                                                                                                                                                                                                                                                                              |
+| Evaluation policy  | The versioned evaluation policy maps traces to outcomes, findings, severity, and confidence; it is distinct from the numeric scoring policy.                                                                                                                                                                                                                                                                                                                                                         |
+| Scoring            | Higher is safer. The original formula is public and versioned. Coverage and readiness gates are displayed beside the score.                                                                                                                                                                                                                                                                                                                                                                          |
+| Guardrails         | Proposals are reviewable diffs. Applying one creates a new revision and never mutates the baseline.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Verification       | Primary deltas are recomputed over stable cases scorable on both sides while plan, mode, exact Live model/request profile, fixture, seed, budgets, engine, and evaluation/scoring policies are held compatible. The candidate must descend from the baseline revision; a report labeled guardrail verification targets exactly the revision applied by the baseline-origin set. New tests and non-comparable cases are shown separately. Utility cases prevent blanket refusal from appearing safer. |
+| Persistence        | Prisma and SQLite, with no user or tenant tables. The database is local plaintext unless the user provides filesystem-level protection.                                                                                                                                                                                                                                                                                                                                                              |
+| Runtime            | One local Node.js process, loopback binding by default, with a persisted in-process job coordinator and no external queue.                                                                                                                                                                                                                                                                                                                                                                           |
+| Language           | UI, bundled test content, findings, and documentation are English only.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Clean-room scope   | All taxonomy, templates, scoring, prompts, and implementation will be original and derived only from the requirements and artifacts created in this repository.                                                                                                                                                                                                                                                                                                                                      |
+| Licensing          | Apache License 2.0; copyright notice is “Copyright 2026 Jordi Garcia Castillón.” The standard license text remains unmodified.                                                                                                                                                                                                                                                                                                                                                                       |
 
 ## 5. Functional requirements
 
-| ID | Requirement | Acceptance summary |
-| --- | --- | --- |
-| FR-01 | Manage target definitions | A user can create a profile and immutable revisions containing a prompt, tools, permissions, declarative Operational Controls, and safe-behavior notes. |
-| FR-02 | Validate all boundaries | Invalid types, excessive sizes, unsupported schemas, duplicate names, and inconsistent permissions are rejected with field-level errors. |
-| FR-03 | Explain the audit surface | The review step summarizes capabilities, sensitive actions, permission scope, and detected control gaps. |
-| FR-04 | Plan adaptive tests | Test selection responds to the prompt, tools, permissions, and deterministic hypotheses while respecting budgets. |
-| FR-05 | Run in Demo Mode | A reference and user-defined target can be assessed deterministically without an API key or outbound external provider call. |
-| FR-06 | Run in Live Mode | A valid server-side configuration enables model-backed planning, target responses, and bounded evaluation. |
-| FR-07 | Simulate tools | Every proposed tool call is parsed, permission-checked, recorded, and answered synthetically; unsupported calls are denied. |
-| FR-08 | Persist progress | Audits expose queued, phase, case, cancellation, completion, interruption, and failure states across page refreshes. |
-| FR-09 | Preserve evidence | Findings navigate to sanitized transcript excerpts, tool attempts, assertions, and provenance without exposing hidden reasoning. |
-| FR-10 | Produce findings | Findings include category, severity, confidence, description, impact, evidence, and actionable recommendation. |
-| FR-11 | Score transparently | Dimension and overall scores expose formula version, applicable weight, result counts, execution coverage, high-impact surface coverage/limitations, and readiness state. |
-| FR-12 | Propose guardrails | The system can propose prompt, tool, permission, and operating-control changes linked to findings. |
-| FR-13 | Review changes | A user can accept, reject, or edit proposals and preview the exact new target revision. |
-| FR-14 | Verify changes | A verification run uses the baseline plan and presents matched deltas, regressions, unchanged cases, and new tests separately. |
-| FR-15 | Control local data | A user can delete a target and its owned audit history after explicit confirmation; active runs cannot be deleted. |
-| FR-16 | Disclose mode limitations | Mode, network use, model metadata, simulation status, and incomplete coverage are visible in setup and reports. |
+| ID    | Requirement               | Acceptance summary                                                                                                                                                        |
+| ----- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-01 | Manage target definitions | A user can create a profile and immutable revisions containing a prompt, tools, permissions, declarative Operational Controls, and safe-behavior notes.                   |
+| FR-02 | Validate all boundaries   | Invalid types, excessive sizes, unsupported schemas, duplicate names, and inconsistent permissions are rejected with field-level errors.                                  |
+| FR-03 | Explain the audit surface | The review step summarizes capabilities, sensitive actions, permission scope, and detected control gaps.                                                                  |
+| FR-04 | Plan adaptive tests       | Test selection responds to the prompt, tools, permissions, and deterministic hypotheses while respecting budgets.                                                         |
+| FR-05 | Run in Demo Mode          | A reference and user-defined target can be assessed deterministically without an API key or outbound external provider call.                                              |
+| FR-06 | Run in Live Mode          | A valid server-side configuration enables model-backed planning, target responses, and bounded evaluation.                                                                |
+| FR-07 | Simulate tools            | Every proposed tool call is parsed, permission-checked, recorded, and answered synthetically; unsupported calls are denied.                                               |
+| FR-08 | Persist progress          | Audits expose queued, phase, case, cancellation, completion, interruption, and failure states across page refreshes.                                                      |
+| FR-09 | Preserve evidence         | Findings navigate to sanitized transcript excerpts, tool attempts, assertions, and provenance without exposing hidden reasoning.                                          |
+| FR-10 | Produce findings          | Findings include category, severity, confidence, description, impact, evidence, and actionable recommendation.                                                            |
+| FR-11 | Score transparently       | Dimension and overall scores expose formula version, applicable weight, result counts, execution coverage, high-impact surface coverage/limitations, and readiness state. |
+| FR-12 | Propose guardrails        | The system can propose prompt, tool, permission, and operating-control changes linked to findings.                                                                        |
+| FR-13 | Review changes            | A user can accept, reject, or edit proposals and preview the exact new target revision.                                                                                   |
+| FR-14 | Verify changes            | A verification run uses the baseline plan and presents matched deltas, regressions, unchanged cases, and new tests separately.                                            |
+| FR-15 | Control local data        | A user can delete a target and its owned audit history after explicit confirmation; active runs cannot be deleted.                                                        |
+| FR-16 | Disclose mode limitations | Mode, network use, model metadata, simulation status, and incomplete coverage are visible in setup and reports.                                                           |
 
 ## 6. Quality attributes
 
@@ -162,7 +162,17 @@ Report export, custom rule packs, external agent connectors, and multi-user gove
 - Use bounded inputs, case counts, turns, output sizes, timeouts, retries, and concurrency.
 - Record evidence, not hidden chain-of-thought. Evaluator output is a concise evaluation-policy decision and citations to observations.
 
-Initial safety budgets are: a 64,000-character system prompt, 32 tools, 64 permission grants, 64 KiB per tool schema, 1 MiB total target payload, 30 cases per plan, 8 interaction steps per case, and 2 concurrently executing live cases. These are centralized configuration values and require an architecture decision to expand.
+The current foundation enforces a 64,000-character system prompt, 32 tools,
+128 permission grants, 64 KiB of canonical UTF-8 per tool schema, and a 128 KiB
+HTTP mutation body. New run records default to 24 maximum cases, 12 interaction
+steps, 8 tool attempts, 4,096 model-output tokens per case, and a five-minute
+duration budget. The case and duration defaults are configurable within hard
+bounds (1–100 cases and 30–3,600 seconds); domain constructors retain absolute
+ceilings of 200 cases, 50 steps/tool attempts, and one hour so corrupted or
+future inputs fail closed. The coordinator is configured for one-to-four local
+workers but no worker loop runs automatically in this foundation, and Live Mode
+is disabled. M3 must consolidate these values into one versioned budget policy
+before execution; M6 must separately calibrate Live concurrency and cost limits.
 
 ### 6.2 Reliability and recoverability
 
@@ -178,7 +188,10 @@ Initial safety budgets are: a 64,000-character system prompt, 32 tools, 64 permi
 - Provide visible UI acknowledgment within 100 ms of local interaction and persistent progress for work over one second.
 - Target sub-200 ms median local reads for normal report views on the bundled dataset.
 - Complete the reference Demo Mode audit in under 15 seconds on a supported developer machine.
-- Bound a run to 12 minutes by default, with per-operation timeouts and cancellation.
+- Keep the current five-minute default run budget configurable within the
+  one-hour domain ceiling, with per-operation timeouts and cancellation. M3
+  benchmarks determine whether the release default changes; the reference Demo
+  still targets completion in under 15 seconds.
 - Paginate or virtualize large evidence collections rather than rendering an unbounded transcript.
 - Prevent model cost surprises through visible case budgets and a pre-run estimate based on configured limits, without hard-coding provider pricing.
 
@@ -223,39 +236,39 @@ Owns the test pyramid, fixtures, security misuse suite, accessibility verificati
 
 ## 8. Required technologies
 
-| Concern | Selected technology or approach |
-| --- | --- |
-| Runtime and package management | Active Node.js LTS, Corepack, pnpm, immutable lockfile |
-| Web application | Next.js App Router and React, running in the Node.js runtime |
-| Language | Strict TypeScript |
-| Runtime validation | Zod at UI, HTTP, persistence-JSON, configuration, and model-output boundaries |
-| Persistence | Prisma ORM and SQLite with committed migrations |
-| Live model integration | Official OpenAI JavaScript SDK through the Responses API adapter |
-| Styling | Tailwind CSS, semantic HTML, application-owned accessible components and design tokens |
-| Forms | React Hook Form integrated with shared Zod input contracts |
-| Unit and integration tests | Vitest and Testing Library |
-| End-to-end tests | Playwright using Demo Mode only in automated runs |
-| Accessibility | Automated axe checks plus manual keyboard and screen-reader smoke tests |
-| Architecture enforcement | TypeScript path policy plus dependency-cruiser boundary rules |
-| Logging | Pino structured local logs with allow-listed fields, redaction, and correlation IDs; no hosted telemetry |
-| Safe evidence rendering | Escaped plain text and application-owned code/text viewers; Markdown is outside the MVP unless separately approved with a sanitizer |
-| Supply-chain checks | Gitleaks for tracked-secret scanning, OSV-Scanner plus package-manager audit for known vulnerabilities, and package-manager license inventory |
-| CI | Platform-neutral keyless pipeline with frozen install, checks, tests, build, and Demo E2E; the repository-hosted runner is selected and pinned in M1 |
+| Concern                        | Selected technology or approach                                                                                                                     |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime and package management | Active Node.js LTS, Corepack, pnpm, immutable lockfile                                                                                              |
+| Web application                | Next.js App Router and React, running in the Node.js runtime                                                                                        |
+| Language                       | Strict TypeScript                                                                                                                                   |
+| Runtime validation             | Zod at UI, HTTP, persistence-JSON, configuration, and model-output boundaries                                                                       |
+| Persistence                    | Prisma ORM and SQLite with committed migrations                                                                                                     |
+| Live model integration         | Official OpenAI JavaScript SDK through the Responses API adapter                                                                                    |
+| Styling                        | Tailwind CSS, semantic HTML, application-owned accessible components and design tokens                                                              |
+| Forms                          | React Hook Form integrated with shared Zod input contracts                                                                                          |
+| Unit and integration tests     | Vitest and Testing Library                                                                                                                          |
+| End-to-end tests               | Playwright using Demo Mode only in automated runs                                                                                                   |
+| Accessibility                  | Automated axe checks plus manual keyboard and screen-reader smoke tests                                                                             |
+| Architecture enforcement       | TypeScript path policy plus repository-owned source-scanning architecture tests                                                                     |
+| Logging                        | Pino structured local logs with allow-listed fields, redaction, and correlation IDs; no hosted telemetry                                            |
+| Safe evidence rendering        | Escaped plain text and application-owned code/text viewers; Markdown is outside the MVP unless separately approved with a sanitizer                 |
+| Supply-chain checks            | Offline repository/secret guard, production-license allow-list, Gitleaks history scan, and OSV lockfile scan; package-manager audit remains M7 work |
+| CI                             | Platform-neutral keyless pipeline on pinned GitHub-hosted Ubuntu and Windows runners with frozen install, checks, coverage, build, and Demo E2E     |
 
 Exact package versions remain an implementation-time compatibility decision; the chosen roles and boundaries are settled. See [Technology Decisions](TECH_DECISIONS.md).
 
 ## 9. Milestones
 
-| Milestone | Outcome | Depends on |
-| --- | --- | --- |
-| M0 — Planning foundation | Complete documentation set ready for owner review and approval | None |
-| M1 — Engineering foundation | Reproducible strict TypeScript application shell and quality pipeline | M0 |
-| M2 — Domain and persistence | Tested domain policies, Prisma schema, migrations, repositories, and lifecycle recovery | M1 |
-| M3 — Target workflow and Demo engine | Complete target editor plus deterministic, side-effect-free audit path | M2 |
-| M4 — Evidence, findings, and scoring | Traceable report with original evaluation/scoring policies, coverage, and accessible evidence views | M3 |
-| M5 — Guardrails and verification | Reviewed revision creation and honest baseline-to-verification comparison | M4 |
-| M6 — Live GPT-5.6 Mode | Server-only OpenAI adapter with structured, bounded, observable failures | M3, M4 |
-| M7 — Release hardening | Security, accessibility, resilience, documentation, and judge-demo release quality | M5, M6 |
+| Milestone                            | Outcome                                                                                             | Depends on |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------- | ---------- |
+| M0 — Planning foundation             | Complete documentation set ready for owner review and approval                                      | None       |
+| M1 — Engineering foundation          | Reproducible strict TypeScript application shell and quality pipeline                               | M0         |
+| M2 — Domain and persistence          | Tested domain policies, Prisma schema, migrations, repositories, and lifecycle recovery             | M1         |
+| M3 — Target workflow and Demo engine | Complete target editor plus deterministic, side-effect-free audit path                              | M2         |
+| M4 — Evidence, findings, and scoring | Traceable report with original evaluation/scoring policies, coverage, and accessible evidence views | M3         |
+| M5 — Guardrails and verification     | Reviewed revision creation and honest baseline-to-verification comparison                           | M4         |
+| M6 — Live GPT-5.6 Mode               | Server-only OpenAI adapter with structured, bounded, observable failures                            | M3, M4     |
+| M7 — Release hardening               | Security, accessibility, resilience, documentation, and judge-demo release quality                  | M5, M6     |
 
 The detailed acceptance criteria and risk retired by each milestone are defined in [Roadmap](ROADMAP.md).
 
@@ -272,7 +285,11 @@ The test suite will be risk-based rather than dominated by UI snapshots:
 7. **Security misuse tests** attempt prompt-context escape, schema exhaustion, unsupported tools, secret leakage, HTML/script rendering, unsafe links, cross-origin/Host/nonce bypass, and execution-boundary bypass.
 8. **Manual release checks** cover Live Mode with a designated test key, keyboard-only navigation, screen-reader smoke testing, reduced motion, narrow viewport, and interrupted-run recovery.
 
-Coverage gates will prioritize domain and application branches at 90% and the repository overall at 80%, with no untested critical security invariant regardless of aggregate percentage.
+The current `test:coverage` gate enforces 75% global branches and 80% functions,
+lines, and statements, and `pnpm verify` runs it. Before M7 acceptance,
+critical domain and application modules receive explicit 90% branch gates while
+the repository remains at least 80% overall. No aggregate percentage excuses an
+untested security invariant.
 
 ## 11. Build and quality pipeline
 
@@ -286,8 +303,11 @@ The implementation pipeline will run in this order:
 6. run unit, property, application, repository, component, accessibility, and security tests;
 7. create a production application build;
 8. start that build against an isolated database and run Demo Mode end-to-end tests;
-9. scan tracked content for secrets and dependencies for known high-severity issues and incompatible licenses; and
-10. retain coverage and failure artifacts while keeping database contents and secrets out of artifacts.
+9. scan tracked/history content for secrets, the lockfile with OSV, and the
+   installed production graph against the license allow-list; add a
+   package-manager audit during M7 if it provides non-duplicative coverage; and
+10. in M7, retain only sanitized coverage/failure artifacts while keeping
+    database contents, environment files, prompts, and secrets out of uploads.
 
 Merge or release is blocked by any failed stage. Live API tests are manual and opt-in so CI remains deterministic, offline-capable, and keyless.
 
@@ -324,24 +344,24 @@ Documentation examples must use synthetic data. Architecture decisions that chan
 
 ## 13. Risk register
 
-| Risk | Likelihood / impact | Mitigation and evidence of control |
-| --- | --- | --- |
-| Audited content injects the auditor | High / High | Keep generator, target, and evaluator contexts separate; mark all target content as data; validate structured outputs; add cross-context injection tests. |
-| A simulated tool becomes an execution primitive | Low / Critical | Closed simulator registry, no generic executor or dynamic imports, synthetic outputs only, explicit deny path, architecture boundary tests. |
-| Findings are hallucinated or unsupported | Medium / High | Prefer deterministic assertions, require evidence links, expose confidence and inconclusive states, correlate duplicate findings, retain human review. |
-| The same model generates and judges tests | Medium / High | Separate roles and prompts, deterministic checks, stable evaluation/scoring policies, utility cases, fixture calibration, and honest limitation disclosure. |
-| Scores obscure severe failures or missing coverage | Medium / High | Show coverage and readiness separately, block readiness on critical failures, make formula public, withhold definitive score when coverage is too low. |
-| Blanket refusal games the score | Medium / High | Include expected-safe utility cases and report security improvement and utility regression together. |
-| Live data exposes sensitive prompt content | Medium / High | Default to Demo, pre-run consent, minimize payloads, redact secrets, server-only credentials, local retention controls. |
-| Model access, behavior, or API shape changes | Medium / Medium | Configurable model identifier, provider port, startup capability validation, normalized errors, Demo fallback chosen explicitly by user. |
-| Unbounded tests create cost or denial of service | Medium / High | Central size/turn/case/time/concurrency budgets, cancellation, estimates, bounded retries, payload depth checks. |
-| SQLite contention or process interruption corrupts lifecycle | Medium / Medium | Short transactions, bounded concurrency, persisted checkpoints, startup reconciliation, migration and recovery tests. |
-| Evidence rendering enables script or link injection | Medium / High | Escaped plain-text/code viewers, no model-supplied links or HTML, restrictive content security policy, and hostile-content tests. |
-| Secrets leak through logs or evidence | Medium / Critical | Structured allow-list logging, redaction at ingestion and logging, no raw provider request logging, secret-canary tests. |
-| Comparison claims improvement from a changed suite | Medium / High | Locked baseline plan, stable case keys, engine/evaluation/scoring compatibility checks, paired delta only, unpaired results separated. |
-| Hackathon scope dilutes the core journey | High / Medium | Milestone exit gates, explicit non-goals, Demo-first ordering, no speculative infrastructure. |
-| Local database is mistaken for encrypted storage | Medium / Medium | Plain-language disclosure, filesystem guidance, deletion controls, no encryption claim. |
-| Originality or licensing is unclear | Low / High | Clean-room work, original tests/evaluation/scoring/prompts, dependency license scan, exact copyright notice, and repository-only design provenance. |
+| Risk                                                         | Likelihood / impact | Mitigation and evidence of control                                                                                                                          |
+| ------------------------------------------------------------ | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Audited content injects the auditor                          | High / High         | Keep generator, target, and evaluator contexts separate; mark all target content as data; validate structured outputs; add cross-context injection tests.   |
+| A simulated tool becomes an execution primitive              | Low / Critical      | Closed simulator registry, no generic executor or dynamic imports, synthetic outputs only, explicit deny path, architecture boundary tests.                 |
+| Findings are hallucinated or unsupported                     | Medium / High       | Prefer deterministic assertions, require evidence links, expose confidence and inconclusive states, correlate duplicate findings, retain human review.      |
+| The same model generates and judges tests                    | Medium / High       | Separate roles and prompts, deterministic checks, stable evaluation/scoring policies, utility cases, fixture calibration, and honest limitation disclosure. |
+| Scores obscure severe failures or missing coverage           | Medium / High       | Show coverage and readiness separately, block readiness on critical failures, make formula public, withhold definitive score when coverage is too low.      |
+| Blanket refusal games the score                              | Medium / High       | Include expected-safe utility cases and report security improvement and utility regression together.                                                        |
+| Live data exposes sensitive prompt content                   | Medium / High       | Default to Demo, pre-run consent, minimize payloads, redact secrets, server-only credentials, local retention controls.                                     |
+| Model access, behavior, or API shape changes                 | Medium / Medium     | Configurable model identifier, provider port, startup capability validation, normalized errors, Demo fallback chosen explicitly by user.                    |
+| Unbounded tests create cost or denial of service             | Medium / High       | Central size/turn/case/time/concurrency budgets, cancellation, estimates, bounded retries, payload depth checks.                                            |
+| SQLite contention or process interruption corrupts lifecycle | Medium / Medium     | Short transactions, bounded concurrency, persisted checkpoints, startup reconciliation, migration and recovery tests.                                       |
+| Evidence rendering enables script or link injection          | Medium / High       | Escaped plain-text/code viewers, no model-supplied links or HTML, restrictive content security policy, and hostile-content tests.                           |
+| Secrets leak through logs or evidence                        | Medium / Critical   | Structured allow-list logging, redaction at ingestion and logging, no raw provider request logging, secret-canary tests.                                    |
+| Comparison claims improvement from a changed suite           | Medium / High       | Locked baseline plan, stable case keys, engine/evaluation/scoring compatibility checks, paired delta only, unpaired results separated.                      |
+| Hackathon scope dilutes the core journey                     | High / Medium       | Milestone exit gates, explicit non-goals, Demo-first ordering, no speculative infrastructure.                                                               |
+| Local database is mistaken for encrypted storage             | Medium / Medium     | Plain-language disclosure, filesystem guidance, deletion controls, no encryption claim.                                                                     |
+| Originality or licensing is unclear                          | Low / High          | Clean-room work, original tests/evaluation/scoring/prompts, dependency license scan, exact copyright notice, and repository-only design provenance.         |
 
 ## 14. Definition of Done for the MVP
 
@@ -368,7 +388,10 @@ No product decision is intentionally left blocking. The following items require 
 3. Verify the selected Prisma version's SQLite support for JSON and enum-like fields; use canonical text plus Zod and database checks where native representation is unsuitable.
 4. Benchmark the initial input and run budgets against the reference fixture and adjust only through a documented decision.
 5. Confirm supported desktop browsers and operating systems based on the hackathon evaluation environment; design baseline is current evergreen browsers on Windows, macOS, and Linux.
-6. Select and pin the repository-hosted CI runner, then calibrate the original test corpus and score thresholds with documented synthetic fixtures; do not tune them to guarantee an impressive improvement.
+6. Keep the selected GitHub-hosted `ubuntu-24.04` and `windows-2025` CI runners
+   pinned, then calibrate the original test corpus and score thresholds with
+   documented synthetic fixtures; do not tune them to guarantee an impressive
+   improvement.
 7. Decide whether SQLite write-ahead logging improves the actual workload after repository integration tests; correctness must not depend on it.
 
 These validations are deliberately deferred because this prompt prohibits dependency installation, framework generation, Prisma creation, and application code.

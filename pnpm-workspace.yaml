@@ -1,0 +1,17 @@
+# pnpm 11 stores project settings in this file. This remains a single-package application.
+packages:
+  - "."
+
+allowBuilds:
+  "@prisma/engines": true
+  better-sqlite3: true
+  esbuild: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true
+
+autoInstallPeers: false
+engineStrict: true
+nodeVersion: 24.18.0
+savePrefix: ""
+strictPeerDependencies: true

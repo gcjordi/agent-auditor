@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a reproducible defect using synthetic data.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a defect. Do not include vulnerabilities,
+        secrets, confidential prompts, personal data, or production databases.
+        Follow SECURITY.md for private reports.
+  - type: input
+    id: revision
+    attributes:
+      label: Commit or version
+      description: The commit SHA or version where the problem occurs.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Node.js version, pnpm version, and browser if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: Explain what happened using only synthetic data.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest deterministic steps or repository test.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Relevant command output
+      description: Remove local paths and sensitive content. Do not paste environment values.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: This report contains no secret, confidential prompt, personal data, or security exploit detail.
+          required: true
+        - label: I reproduced this without a live provider or real external tool.
+          required: true

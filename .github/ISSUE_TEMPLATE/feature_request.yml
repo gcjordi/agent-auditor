@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a scoped improvement that preserves the project charter.
+title: "feature: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or engineering problem should be solved?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior, not a preferred implementation alone.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Architecture and security effects
+      description: Note any effect on trust boundaries, persistence, tools, providers, modes, or accessibility.
+    validations:
+      required: true
+  - type: checkboxes
+    id: charter
+    attributes:
+      label: Charter confirmation
+      options:
+        - label: This proposal does not require target-controlled real tools, arbitrary code, or secret material.
+          required: true

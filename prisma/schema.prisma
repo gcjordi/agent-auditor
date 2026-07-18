@@ -1,0 +1,602 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model AgentProfile {
+  id            String    @id
+  name          String
+  normalizedName String
+  description   String
+  recordVersion Int       @default(1)
+  createdAt     DateTime
+  updatedAt     DateTime
+  archivedAt    DateTime?
+
+  revisions AgentRevision[]
+
+  @@index([archivedAt, updatedAt(sort: Desc)])
+  @@index([normalizedName])
+}
+
+model AgentRevision {
+  id                               String   @id
+  agentProfileId                   String
+  revisionNumber                   Int
+  sourceRevisionId                 String?
+  systemPrompt                     String
+  safeBehaviorNotes                String
+  operationalControlsSchemaVersion String
+  operationalControlsJson          String
+  definitionSchemaVersion          String
+  fingerprint                      String
+  contentScanVersion               String
+  contentScanStatus                String
+  secretWarningAcknowledgedAt      DateTime?
+  creationSource                   String
+  createdAt                        DateTime
+
+  agentProfile AgentProfile @relation(fields: [agentProfileId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sourceRevision AgentRevision? @relation("RevisionLineage", fields: [sourceRevisionId, agentProfileId], references: [id, agentProfileId], onDelete: Restrict, onUpdate: Cascade)
+  descendantRevisions AgentRevision[] @relation("RevisionLineage")
+  tools ToolDefinition[]
+  permissionGrants PermissionGrant[]
+  auditPlans AuditPlan[]
+  auditRuns AuditRun[]
+  sourceGuardrailSets GuardrailSet[] @relation("GuardrailSourceRevision")
+  appliedGuardrailSets GuardrailSet[] @relation("GuardrailAppliedRevision")
+
+  @@unique([agentProfileId, revisionNumber])
+  @@unique([id, agentProfileId])
+  @@index([agentProfileId, revisionNumber(sort: Desc)])
+  @@index([agentProfileId, createdAt(sort: Desc)])
+  @@index([agentProfileId, fingerprint])
+}
+
+model ToolDefinition {
+  id                  String @id
+  agentRevisionId     String
+  name                String
+  displayName         String
+  description         String
+  schemaVersion       String
+  inputSchemaJson     String
+  simulatorId         String
+  simulatorConfigSchemaVersion String
+  simulatorConfigJson String
+  capabilityKey       String
+  capabilityImpact    String
+  capabilityDataSensitivity String
+  capabilityDestructive Boolean
+  ordinal             Int
+  fingerprint         String
+
+  agentRevision AgentRevision @relation(fields: [agentRevisionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  permissionGrants PermissionGrant[] @relation("PermissionToolOwnership")
+
+  @@unique([agentRevisionId, name])
+  @@unique([agentRevisionId, capabilityKey])
+  @@unique([agentRevisionId, ordinal])
+  @@unique([agentRevisionId, fingerprint])
+  @@unique([id, agentRevisionId])
+  @@index([simulatorId])
+}
+
+model PermissionGrant {
+  id                   String @id
+  agentRevisionId      String
+  toolDefinitionId     String?
+  effect               String
+  capabilityKey        String
+  resourceType         String
+  scopeSchemaVersion   String
+  scopeJson            String
+  conditionsSchemaVersion String
+  conditionsJson       String
+  requiresConfirmation Boolean
+  ordinal              Int
+  fingerprint          String
+
+  agentRevision AgentRevision @relation(fields: [agentRevisionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  toolDefinition ToolDefinition? @relation("PermissionToolOwnership", fields: [toolDefinitionId, agentRevisionId], references: [id, agentRevisionId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([agentRevisionId, ordinal])
+  @@unique([agentRevisionId, fingerprint])
+  @@index([agentRevisionId, capabilityKey])
+}
+
+model AuditPlan {
+  id                      String @id
+  agentRevisionId         String
+  targetFingerprint       String
+  kind                    String
+  status                  String
+  seed                    String
+  engineVersion           String
+  taxonomyVersion         String
+  templateVersion         String
+  evaluationPolicyVersion String
+  scoringPolicyVersion    String
+  fixtureVersion          String
+  budgetSchemaVersion     String
+  budgetJson              String
+  coverageSchemaVersion   String
+  coverageLimitationsJson String
+  fingerprint             String?
+  createdAt               DateTime
+  lockedAt                DateTime?
+  abandonedAt             DateTime?
+
+  agentRevision AgentRevision @relation(fields: [agentRevisionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  riskHypotheses RiskHypothesis[]
+  testCases AuditTestCase[]
+  auditRuns AuditRun[]
+  testExecutions TestExecution[] @relation("ExecutionPlan")
+
+  @@unique([agentRevisionId, fingerprint])
+  @@index([agentRevisionId, createdAt(sort: Desc)])
+  @@index([kind, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model RiskHypothesis {
+  id                 String @id
+  auditPlanId        String
+  riskCategory       String
+  primaryDimension   String
+  potentialSeverity  String
+  priority           Int
+  title              String
+  rationale          String
+  source             String
+  capabilitySchemaVersion String
+  capabilityKeysJson String
+  ordinal            Int
+
+  auditPlan AuditPlan @relation(fields: [auditPlanId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  testCases AuditTestCase[] @relation("CaseHypothesisOwnership")
+
+  @@unique([auditPlanId, ordinal])
+  @@unique([id, auditPlanId])
+  @@index([auditPlanId, primaryDimension])
+}
+
+model AuditTestCase {
+  id                                String @id
+  auditPlanId                       String
+  riskHypothesisId                  String?
+  stableKey                         String
+  definitionFingerprint             String
+  source                            String
+  primaryDimension                  String
+  riskCategory                      String
+  severity                          String
+  severityWeight                    Int
+  isUtility                         Boolean
+  title                             String
+  rationale                         String
+  applicableCapabilitySchemaVersion String
+  applicableCapabilityKeysJson      String
+  maxInteractionSteps               Int
+  oracleSchemaVersion               String
+  oracleJson                        String
+  version                           String
+  ordinal                           Int
+
+  // Reserved for the milestone-three planner. They remain nullable until the
+  // richer executable-case contract is introduced and validated in the domain.
+  objective             String?
+  setupSchemaVersion    String?
+  setupJson             String?
+  stimulusSchemaVersion String?
+  stimulusJson          String?
+  fixtureVersion        String?
+  budgetSchemaVersion   String?
+  budgetJson            String?
+
+  auditPlan AuditPlan @relation(fields: [auditPlanId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  riskHypothesis RiskHypothesis? @relation("CaseHypothesisOwnership", fields: [riskHypothesisId, auditPlanId], references: [id, auditPlanId], onDelete: Restrict, onUpdate: Cascade)
+  testExecutions TestExecution[] @relation("ExecutionCaseOwnership")
+
+  @@unique([auditPlanId, stableKey])
+  @@unique([auditPlanId, ordinal])
+  @@unique([id, auditPlanId])
+  @@index([auditPlanId, primaryDimension, severity])
+}
+
+model AuditRun {
+  id                               String @id
+  agentRevisionId                  String
+  agentRevisionFingerprint         String
+  runPurpose                       String
+  auditPlanId                      String?
+  auditPlanFingerprint             String?
+  baselineRunId                    String?
+  retryOfRunId                     String?
+  idempotencyKey                   String @unique
+  requestFingerprint               String
+  mode                             String
+  modelReference                   String?
+  modelRequestProfileSchemaVersion String?
+  modelRequestProfileJson          String?
+  modelRequestProfileDigest        String?
+  liveConsentVersion               String?
+  liveConsentAt                    DateTime?
+  transmissionSummaryDigest        String?
+  status                           String
+  engineVersion                    String
+  taxonomyVersion                  String
+  evaluationPolicyVersion          String
+  scoringPolicyVersion             String
+  fixtureVersion                   String
+  seed                             String
+  budgetSchemaVersion              String
+  budgetJson                       String
+  plannedCaseCount                 Int
+  completedCaseCount               Int
+  currentPhase                     String
+  attemptNumber                    Int
+  recordVersion                    Int
+  cancellationRequestedAt          DateTime?
+  failureCode                      String?
+  failureSummary                   String?
+  createdAt                        DateTime
+  startedAt                        DateTime?
+  completedAt                      DateTime?
+  updatedAt                        DateTime
+
+  agentRevision AgentRevision @relation(fields: [agentRevisionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  auditPlan AuditPlan? @relation(fields: [auditPlanId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  baselineRun AuditRun? @relation("AuditBaseline", fields: [baselineRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  verificationRuns AuditRun[] @relation("AuditBaseline")
+  retryOfRun AuditRun? @relation("AuditRetry", fields: [retryOfRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  retryRuns AuditRun[] @relation("AuditRetry")
+  auditJob AuditJob?
+  testExecutions TestExecution[] @relation("ExecutionRunPlanOwnership")
+  evidenceRecords EvidenceRecord[] @relation("EvidenceRun")
+  findings Finding[] @relation("FindingRun")
+  scorecard Scorecard?
+  guardrailSets GuardrailSet[]
+  baselineComparisons AuditComparison[] @relation("ComparisonBaselineRun")
+  verificationComparisons AuditComparison[] @relation("ComparisonVerificationRun")
+  supplementalComparisons AuditComparison[] @relation("ComparisonSupplementalRun")
+
+  @@unique([id, auditPlanId])
+  @@index([status, updatedAt])
+  @@index([agentRevisionId, createdAt(sort: Desc)])
+  @@index([auditPlanId, createdAt])
+  @@index([baselineRunId])
+  @@index([retryOfRunId])
+}
+
+model AuditJob {
+  id             String @id
+  auditRunId     String @unique
+  status         String
+  stage          String
+  leaseOwner     String?
+  leaseExpiresAt DateTime?
+  nextAttemptAt  DateTime?
+  attemptCount   Int
+  recordVersion  Int
+  lastErrorCode  String?
+  createdAt      DateTime
+  updatedAt      DateTime
+
+  auditRun AuditRun @relation(fields: [auditRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([leaseExpiresAt])
+}
+
+model TestExecution {
+  id                      String @id
+  auditRunId              String
+  auditPlanId             String
+  auditTestCaseId         String
+  attemptNumber           Int
+  status                  String
+  outcome                 String?
+  skipReasonCode          String?
+  isEffective             Boolean
+  seed                    String
+  stepCount               Int
+  toolAttemptCount        Int
+  usageSchemaVersion      String
+  usageJson               String
+  terminalReason          String?
+  errorCode               String?
+  startedAt               DateTime?
+  completedAt             DateTime?
+  createdAt               DateTime
+
+  auditRun AuditRun @relation("ExecutionRunPlanOwnership", fields: [auditRunId, auditPlanId], references: [id, auditPlanId], onDelete: Restrict, onUpdate: Cascade)
+  auditPlan AuditPlan @relation("ExecutionPlan", fields: [auditPlanId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  auditTestCase AuditTestCase @relation("ExecutionCaseOwnership", fields: [auditTestCaseId, auditPlanId], references: [id, auditPlanId], onDelete: Restrict, onUpdate: Cascade)
+  traceEvents TraceEvent[]
+  evidenceRecords EvidenceRecord[] @relation("EvidenceExecutionOwnership")
+  baselineComparisonCases ComparisonCase[] @relation("BaselineComparisonExecution")
+  verificationComparisonCases ComparisonCase[] @relation("VerificationComparisonExecution")
+
+  @@unique([auditRunId, auditTestCaseId, attemptNumber])
+  @@unique([id, auditRunId])
+  @@index([auditRunId, status])
+  @@index([auditTestCaseId])
+  @@index([auditRunId, outcome])
+}
+
+model TraceEvent {
+  id                   String @id
+  testExecutionId      String
+  sequence             Int
+  eventType            String
+  actor                String
+  payloadSchemaVersion String
+  sanitizedPayloadJson String
+  contentDigest        String
+  occurredAt           DateTime
+  createdAt            DateTime
+
+  testExecution TestExecution @relation(fields: [testExecutionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([testExecutionId, sequence])
+  @@index([testExecutionId, eventType])
+}
+
+model EvidenceRecord {
+  id                  String @id
+  auditRunId          String
+  testExecutionId     String?
+  kind                String
+  sourceSequenceStart Int?
+  sourceSequenceEnd   Int?
+  contentDigest       String
+  sanitizedExcerpt    String
+  redactionApplied    Boolean
+  createdAt           DateTime
+
+  auditRun AuditRun @relation("EvidenceRun", fields: [auditRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  testExecution TestExecution? @relation("EvidenceExecutionOwnership", fields: [testExecutionId, auditRunId], references: [id, auditRunId], onDelete: Restrict, onUpdate: Cascade)
+  findingEvidence FindingEvidence[]
+
+  @@unique([id, auditRunId])
+  @@index([testExecutionId])
+  @@index([auditRunId, kind])
+  @@index([auditRunId, contentDigest])
+}
+
+model Finding {
+  id                          String @id
+  auditRunId                  String
+  fingerprint                 String
+  evaluationPolicyVersion     String
+  failureMechanism            String
+  riskCategory                String
+  primaryDimension            String
+  severity                    String
+  confidence                  String
+  title                       String
+  description                 String
+  impact                      String
+  recommendation              String
+  affectedTestKeysSchemaVersion String
+  affectedTestKeysJson        String
+  capabilityKeysSchemaVersion String
+  capabilityKeysJson          String
+  createdAt                   DateTime
+
+  auditRun AuditRun @relation("FindingRun", fields: [auditRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  findingEvidence FindingEvidence[]
+  guardrailFindings GuardrailFinding[]
+  baselineFindingMatches FindingMatch[] @relation("BaselineFindingMatch")
+  verificationFindingMatches FindingMatch[] @relation("VerificationFindingMatch")
+
+  @@unique([auditRunId, fingerprint])
+  @@unique([id, auditRunId])
+  @@index([auditRunId, severity])
+  @@index([auditRunId, primaryDimension])
+  @@index([riskCategory, severity])
+}
+
+model FindingEvidence {
+  id               String @id
+  auditRunId       String
+  findingId        String
+  evidenceRecordId String
+  ordinal          Int
+
+  finding Finding @relation(fields: [findingId, auditRunId], references: [id, auditRunId], onDelete: Restrict, onUpdate: Cascade)
+  evidenceRecord EvidenceRecord @relation(fields: [evidenceRecordId, auditRunId], references: [id, auditRunId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([findingId, evidenceRecordId])
+  @@unique([findingId, ordinal])
+}
+
+model Scorecard {
+  id                                     String @id
+  auditRunId                             String @unique
+  scoringPolicyVersion                   String
+  overallSecurityScoreBps                Int?
+  utilityScoreBps                        Int?
+  securityCoverageBps                    Int?
+  utilityCoverageBps                     Int?
+  highImpactSurfaceCoverageBps           Int?
+  applicableHighImpactCapabilityCount    Int
+  coveredHighImpactCapabilityCount       Int
+  unresolvedHighImpactLimitationCount    Int
+  readiness                              String
+  securityProvisional                    Boolean
+  utilityProvisional                     Boolean
+  securityApplicableWeight               Int
+  securityScorableWeight                 Int
+  utilityApplicableWeight                Int
+  utilityScorableWeight                  Int
+  calculationSchemaVersion               String
+  calculationJson                        String
+  calculationDigest                      String
+  createdAt                              DateTime
+
+  auditRun AuditRun @relation(fields: [auditRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  dimensionScores DimensionScore[]
+}
+
+model DimensionScore {
+  id                    String @id
+  scorecardId           String
+  dimensionKey          String
+  isUtility             Boolean
+  scoreBps              Int?
+  coverageBps           Int?
+  applicableWeight      Int
+  scorableWeight        Int
+  observedRiskUnits     Int
+  possibleRiskUnits     Int
+  resultSchemaVersion   String
+  resultCountsJson      String
+  calculationDigest     String
+
+  scorecard Scorecard @relation(fields: [scorecardId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([scorecardId, dimensionKey])
+}
+
+model GuardrailSet {
+  id                        String @id
+  sourceAuditRunId          String
+  sourceAgentRevisionId     String
+  sourceRevisionFingerprint String
+  status                    String
+  appliedAgentRevisionId    String?
+  recordVersion             Int
+  createdAt                 DateTime
+  updatedAt                 DateTime
+  appliedAt                 DateTime?
+
+  sourceAuditRun AuditRun @relation(fields: [sourceAuditRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sourceAgentRevision AgentRevision @relation("GuardrailSourceRevision", fields: [sourceAgentRevisionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  appliedAgentRevision AgentRevision? @relation("GuardrailAppliedRevision", fields: [appliedAgentRevisionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  proposals GuardrailProposal[]
+
+  @@index([sourceAuditRunId, createdAt(sort: Desc)])
+  @@index([sourceAuditRunId, status])
+}
+
+model GuardrailProposal {
+  id                       String @id
+  guardrailSetId           String
+  type                     String
+  title                    String
+  rationale                String
+  defenseInDepthRationale  String?
+  expectedEffect           String
+  tradeOffs                String
+  riskOfBehaviorChange     String
+  changeSchemaVersion      String
+  proposedChangeJson       String
+  expectedSourceFingerprint String
+  priority                 Int
+  status                   String
+  ordinal                  Int
+  createdAt                DateTime
+  updatedAt                DateTime
+
+  guardrailSet GuardrailSet @relation(fields: [guardrailSetId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  findingLinks GuardrailFinding[]
+
+  @@unique([guardrailSetId, ordinal])
+  @@index([guardrailSetId, status])
+}
+
+model GuardrailFinding {
+  id                  String @id
+  guardrailProposalId String
+  findingId           String
+
+  guardrailProposal GuardrailProposal @relation(fields: [guardrailProposalId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  finding Finding @relation(fields: [findingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([guardrailProposalId, findingId])
+}
+
+model AuditComparison {
+  id                                  String @id
+  baselineRunId                       String
+  verificationRunId                   String
+  supplementalRunId                   String?
+  supplementalPlanFingerprint         String?
+  compatibilityStatus                 String
+  compatibilitySchemaVersion          String
+  compatibilityReasonsJson            String
+  baselinePairedSecurityScoreBps       Int?
+  verificationPairedSecurityScoreBps   Int?
+  securityDeltaBps                    Int?
+  pairedSecurityCoverageBps           Int?
+  pairedSecurityProvisional           Boolean?
+  fullRunCoverageDeltaBps              Int?
+  baselinePairedUtilityScoreBps        Int?
+  verificationPairedUtilityScoreBps    Int?
+  pairedUtilityCoverageBps             Int?
+  pairedUtilityProvisional             Boolean?
+  utilityDeltaBps                     Int?
+  readinessChange                     String?
+  summarySchemaVersion                String
+  supplementalSummaryJson             String?
+  calculationDigest                  String?
+  createdAt                          DateTime
+
+  baselineRun AuditRun @relation("ComparisonBaselineRun", fields: [baselineRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  verificationRun AuditRun @relation("ComparisonVerificationRun", fields: [verificationRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  supplementalRun AuditRun? @relation("ComparisonSupplementalRun", fields: [supplementalRunId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  comparisonCases ComparisonCase[]
+  findingMatches FindingMatch[]
+
+  @@unique([baselineRunId, verificationRunId])
+  @@index([verificationRunId])
+  @@index([supplementalRunId])
+}
+
+model ComparisonCase {
+  id                       String @id
+  auditComparisonId        String
+  stableTestKey            String
+  definitionFingerprint    String
+  baselineExecutionId      String
+  verificationExecutionId  String
+  baselineOutcome          String
+  verificationOutcome      String
+  classification           String
+  includedInPairedScore    Boolean
+  severityWeight           Int
+  baselineRiskUnits        Int
+  verificationRiskUnits    Int
+  isUtility                Boolean
+  ordinal                  Int
+
+  auditComparison AuditComparison @relation(fields: [auditComparisonId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  baselineExecution TestExecution @relation("BaselineComparisonExecution", fields: [baselineExecutionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  verificationExecution TestExecution @relation("VerificationComparisonExecution", fields: [verificationExecutionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([auditComparisonId, stableTestKey])
+  @@unique([auditComparisonId, ordinal])
+}
+
+model FindingMatch {
+  id                    String @id
+  auditComparisonId     String
+  baselineFindingId     String?
+  verificationFindingId String?
+  classification        String
+  matchConfidence       String
+  rationale             String
+
+  auditComparison AuditComparison @relation(fields: [auditComparisonId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  baselineFinding Finding? @relation("BaselineFindingMatch", fields: [baselineFindingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  verificationFinding Finding? @relation("VerificationFindingMatch", fields: [verificationFindingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([auditComparisonId, classification])
+}
