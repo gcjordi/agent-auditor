@@ -288,4 +288,4 @@ for clearly attributed open-source standards and dependencies.
 
 Licensed under the [Apache License 2.0](LICENSE).
 
-Copyright 2026 Jordi Garcia Castillón.
+Copyright 2026 Jordi Garcia Castillon.
